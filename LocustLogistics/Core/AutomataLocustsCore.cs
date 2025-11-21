@@ -1,8 +1,16 @@
-﻿using LocustLogistics.Core.Interfaces;
+﻿using LocustLogistics.Core.AiTasks;
+using LocustLogistics.Core.BlockEntities;
+using LocustLogistics.Core.EntityBehaviors;
+using LocustLogistics.Core.Interfaces;
 using LocustLogistics.Core.Items;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Common;
+using Vintagestory.API.Server;
+using Vintagestory.GameContent;
+
+#nullable disable warnings
 
 namespace LocustLogistics.Core
 {
@@ -15,38 +23,52 @@ namespace LocustLogistics.Core
         public event Action<LocustHive, IHiveMember> MemberTuned;
         public event Action<LocustHive, IHiveMember> MemberDetuned;
 
-        long nextId;
-        Dictionary<long, LocustHive> hives = new Dictionary<long, LocustHive>();
+        int nextId;
+        Dictionary<int, LocustHive> hives = new Dictionary<int, LocustHive>();
 
         public override void Start(ICoreAPI api)
         {
             api.RegisterItemClass("ItemHiveTuner", typeof(ItemHiveTuner));
+            api.RegisterEntityBehaviorClass("hivetunable", typeof(EntityBehaviorHiveTunable));
+            api.RegisterBlockEntityClass("TamedLocustNest", typeof(BETamedLocustNest));
         }
 
-        public LocustHive GetHive(long id)
+        public override void StartServerSide(ICoreServerAPI api)
         {
-            // Try to find it first
-            if (hives.TryGetValue(id, out LocustHive hive))
-            {
-                return hive;
-            }
-
-            // Otherwise make one with the given id.
-            return NewHiveWithId(id);
+            base.StartServerSide(api);
+            AiTaskRegistry.Register<AiTaskReturnToNest>("returnToNest");
         }
 
-        public LocustHive CreateHive()
+        public LocustHive GetHive(int id)
         {
-            return NewHiveWithId(nextId++);
+            return hives[id];
         }
 
-        private LocustHive NewHiveWithId(long id)
+        /// <summary>
+        /// Creates a new hive with the given member
+        /// </summary>
+        /// <param name="firstMember"></param>
+        /// <returns></returns>
+        /// <exception cref="OutOfMemoryException"></exception>
+        public LocustHive CreateHive(IHiveMember firstMember)
         {
-            var newHive = new LocustHive(nextId++);
-            hives[newHive.Id] = newHive;
-            newHive.MemberTuned += (member) => MemberTuned?.Invoke(newHive, member);
-            newHive.MemberDetuned += (member) => MemberDetuned?.Invoke(newHive, member);
-            return newHive;
+            // Find the next free id.
+            // We probably don't need to worry about checking if all keys are taken
+            // since that's tens of GB of RAM and you'd have bigger problems than
+            // not being able to make a new hive... I like the check for completeness though. :)
+            if (hives.Count == int.MaxValue) throw new OutOfMemoryException("Cant make any more hives.");
+            while (hives.ContainsKey(nextId))
+                nextId++;
+
+            var hive = new LocustHive(nextId++, 0); // Post increment for the next time.
+            hives[hive.Id] = hive;
+            hive.MemberTuned += (member) => MemberTuned?.Invoke(hive, member);
+            hive.MemberDetuned += (member) => {
+                MemberDetuned?.Invoke(hive, member);
+                if (hive.Count == 0) hives.Remove(hive.Id); // If the hive no longer has members, release it's reference.
+            };
+            hive.Tune(firstMember);
+            return hive;
         }
 
     }

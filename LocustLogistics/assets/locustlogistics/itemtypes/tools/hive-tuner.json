@@ -27,8 +27,11 @@
       }
     }
   ],
-  "shape": { "base": "item/tool/wrench/iron1" },
-  "textures": { "base": "item/tool/material/ebony" },
+  "shape": { "base": "game:item/tool/wrench/iron1" },
+  "textures": {
+    "metal": { "base": "game:block/metal/ingot/bronze" },
+    "wood": { "base": "game:item/tool/material/ebony" }
+  },
   "attributes": {},
   "creativeinventory": {
     "general": [ "*" ],

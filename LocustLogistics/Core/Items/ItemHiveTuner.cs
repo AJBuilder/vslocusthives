@@ -2,6 +2,7 @@
 using LocustLogistics.Core.Interfaces;
 using System;
 using System.Linq;
+using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -18,16 +19,17 @@ namespace LocustLogistics.Core.Items
     public class ItemHiveTuner : Item
     {
         ICoreAPI api;
+        AutomataLocustsCore modSystem;
         SkillItem[] toolModes;
-        HiveTunerMode toolMode;
-        LocustHive calibratedHive;
 
         public override void OnLoaded(ICoreAPI api)
         {
             base.OnLoaded(api);
 
             this.api = api;
+            modSystem = api.ModLoader.GetModSystem<AutomataLocustsCore>();
             ICoreClientAPI capi = api as ICoreClientAPI;
+
 
             toolModes = ObjectCacheUtil.GetOrCreate(api, "logiTunerToolModes", () =>
             {
@@ -36,7 +38,7 @@ namespace LocustLogistics.Core.Items
                 // Modes
                 // 1. Tune to nest
                 // 2. Detune
-                modes = new SkillItem[3];
+                modes = new SkillItem[4];
                 modes[(int)HiveTunerMode.Calibrate] = new SkillItem() { Code = new AssetLocation("calibrate"), Name = "calibrate" };
                 modes[(int)HiveTunerMode.Tune] = new SkillItem() { Code = new AssetLocation("tune"), Name = "Tune" };
                 modes[(int)HiveTunerMode.Detune] = new SkillItem() { Code = new AssetLocation("detune"), Name = "Detune" };
@@ -73,15 +75,18 @@ namespace LocustLogistics.Core.Items
                 if (byEntity.World.Claims.TryAccess(byPlayer, onBlockPos, EnumBlockAccessFlags.BuildOrBreak))
                 {
                     BlockEntity be = byEntity.World.BlockAccessor.GetBlockEntity(onBlockPos);
-                    target = be as IHiveMember;
-                    if (target == null)
+                    if(be != null)
                     {
-                        target = be.GetBehavior<IHiveMember>();
-                    }
+                        target = be as IHiveMember;
+                        if (target == null)
+                        {
+                            target = be.GetBehavior<IHiveMember>();
+                        }
 
-                    if (target != null)
-                    {
-                        be.MarkDirty();
+                        if (target != null)
+                        {
+                            be.MarkDirty();
+                        }
                     }
                 }
             }
@@ -94,23 +99,52 @@ namespace LocustLogistics.Core.Items
                             .SidedProperties
                             .Behaviors
                             .OfType<IHiveMember>()
-                            .First();
+                            .FirstOrDefault();
                 }
             }
 
-            if (target != null)
+            var attributes = slot.Itemstack.Attributes;
+            var mode = (HiveTunerMode)Math.Min(toolModes.Length - 1, attributes.GetInt("toolMode"));
+
+            // If there is no target, and mode is calibrate, clear the calibration
+            if (target == null)
             {
+                if(mode == HiveTunerMode.Calibrate)
+                {
+                    handling = EnumHandHandling.PreventDefaultAction;
+                    attributes.RemoveAttribute("calibratedHive");
+                }
+            }
+            else
+            {
+                // If there is a target, operate on it.
                 handling = EnumHandHandling.PreventDefaultAction;
-                switch (toolMode)
+                switch (mode)
                 {
                     case HiveTunerMode.Calibrate:
-                        calibratedHive = target.Hive;
+                        var h = target.Hive;
+                        if(h != null) attributes.SetInt("calibratedHive", target.Hive.Id);
+                        else if(api is ICoreClientAPI capi){
+                            capi.TriggerIngameError(this, "No target hive", "Target is not tuned to a Hive.");
+                        }
                         break;
                     case HiveTunerMode.Tune:
-                        target.Hive = calibratedHive;
+                        var hiveId = attributes.TryGetInt("calibratedHive");
+                        if (hiveId.HasValue)
+                        {
+                            modSystem.GetHive(hiveId.Value).Tune(target);
+                        }
+                        else {
+                            modSystem.CreateHive(target);
+                        }
                         break;
                     case HiveTunerMode.Detune:
-                        target.Hive.Detune(target);
+                        var hive = target.Hive;
+                        if(hive != null) hive.Detune(target);
+                        else if (api is ICoreClientAPI capi)
+                        {
+                            capi.TriggerIngameError(this, "No target hive", "Target is not tuned to a Hive.");
+                        }
                         break;
                 }
             }
@@ -129,6 +163,13 @@ namespace LocustLogistics.Core.Items
         public override void SetToolMode(ItemSlot slot, IPlayer byPlayer, BlockSelection blockSel, int toolMode)
         {
             slot.Itemstack.Attributes.SetInt("toolMode", toolMode);
+        }
+
+        public override void GetHeldItemInfo(ItemSlot inSlot, StringBuilder dsc, IWorldAccessor world, bool withDebugInfo)
+        {
+            base.GetHeldItemInfo(inSlot, dsc, world, withDebugInfo);
+            var id = inSlot.Itemstack.Attributes.TryGetInt("calibratedHive");
+            dsc.AppendLine($"Calibrated Hive: {(id.HasValue ? id.Value : "None")}");
         }
     }
 }

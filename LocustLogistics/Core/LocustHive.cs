@@ -4,24 +4,38 @@ using System.Collections.Generic;
 
 namespace LocustLogistics.Core
 {
-
+    /// <summary>
+    /// Represents a collection of members.
+    /// These members:
+    ///   1. Always count towards being apart of this hive across the member and hive loading/unloading
+    ///   2. Are only in the members list when they are loaded.
+    /// </summary>
     public class LocustHive
     {
         private readonly HashSet<IHiveMember> _members = new();
         private readonly HashSet<ILocustNest> _nests = new();
+        private int _count;
 
         // Events
         public event Action<IHiveMember> MemberTuned;
         public event Action<IHiveMember> MemberDetuned;
 
-        public long Id { get; }
+        public int Id { get; }
         public IEnumerable<IHiveMember> Members => _members;
         public IEnumerable<ILocustNest> Nests => _nests;
 
+        /// <summary>
+        /// The number of members in this Hive.
+        /// Is NOT equal to the current members.
+        /// This tracks loaded AND unloaded members.
+        /// </summary>
+        public int Count => _count;
 
-        public LocustHive(long id)
+
+        public LocustHive(int id, int count)
         {
             Id = id;
+            this._count = count;
         }
 
         //public IHiveStorage NearestStorage(Vec3d position, IHiveMember except)
@@ -134,36 +148,63 @@ namespace LocustLogistics.Core
         //    return assignedWorker;
         //}
 
-
+        /// <summary>
+        /// Add to this hive AND increment the reference counter.
+        /// A hive will count this member even when it is not present in members list.
+        /// </summary>
+        /// <param name="member"></param>
         public void Tune(IHiveMember member)
         {
             // Remove from existing
             LocustHive existing = member.Hive;
             existing?.Detune(member);
 
-            _members.Add(member);
-
-            // Presort
-            if(member is ILocustNest nest)
-            {
-                _nests.Add(nest);
-            }
-            member.Hive = this;
-
+            Add(member);
+            _count++;
             MemberTuned?.Invoke(member);
         }
 
+        /// <summary>
+        /// Add to this hive AND decrement the reference counter.
+        /// A hive will no longer consider this member.
+        /// </summary>
+        /// <param name="member"></param>
         public void Detune(IHiveMember member)
+        {
+            Remove(member);
+            _count--;
+            MemberDetuned?.Invoke(member);
+        }
+
+        /// <summary>
+        /// Add to this hive without incrementing the reference counter.
+        /// To be used when a member is already tuned to a hive, but was unloaded
+        /// and is now loaded back in.
+        /// </summary>
+        /// <param name="member"></param>
+        public void Add(IHiveMember member)
+        {
+            _members.Add(member);
+            if (member is ILocustNest nest)
+            {
+                _nests.Add(nest);
+            }
+        }
+
+        /// <summary>
+        /// Remove from this hive without decrementing the reference counter.
+        /// To be used when a member is tuned to a hive, but is being unloaded.
+        /// </summary>
+        /// <param name="member"></param>
+        public void Remove(IHiveMember member)
         {
             _members.Remove(member);
             if (member is ILocustNest nest)
             {
                 _nests.Remove(nest);
             }
-            member.Hive = null;
-
-            MemberDetuned?.Invoke(member);
         }
+
     }
 
 }
