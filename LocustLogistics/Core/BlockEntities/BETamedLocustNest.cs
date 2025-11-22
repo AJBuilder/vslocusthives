@@ -19,6 +19,8 @@ namespace LocustLogistics.Core.BlockEntities
         int? hiveId;
         AutomataLocustsCore modSystem;
         HashSet<EntityLocust> locusts;
+        List<(string code, byte[] data)> pendingLocustData;
+
         public BETamedLocustNest()
         {
             locusts = new HashSet<EntityLocust>();
@@ -36,6 +38,24 @@ namespace LocustLogistics.Core.BlockEntities
         {
             base.Initialize(api);
             modSystem = api.ModLoader.GetModSystem<AutomataLocustsCore>();
+
+            // Deserialize any pending locust data from FromTreeAttributes
+            if (pendingLocustData != null)
+            {
+                foreach (var (code, data) in pendingLocustData)
+                {
+                    var etype = api.World.GetEntityType(new AssetLocation(code));
+                    if (etype == null) continue;
+
+                    var locust = api.World.ClassRegistry.CreateEntity(etype) as EntityLocust;
+                    if (locust == null) continue;
+
+                    SerializerUtil.FromBytes(data, (reader) => locust.FromBytes(reader, false));
+                    locusts.Add(locust);
+                }
+                pendingLocustData = null;
+            }
+
             if (!hiveId.HasValue) hiveId = modSystem.CreateHive();
             modSystem.Tune(hiveId, this);
         }
@@ -107,23 +127,41 @@ namespace LocustLogistics.Core.BlockEntities
             // for getting this id to Initialize.
             hiveId = id;
 
-            locusts.Clear();
             int count = tree.GetInt("locustCount");
-            for (int i = 0; i < count; i++)
+
+            // If Api is not available yet, store raw data for later deserialization in Initialize
+            if (Api == null)
             {
-                string code = tree.GetString($"locust_{i}_code");
-                byte[] data = tree.GetBytes($"locust_{i}_data");
+                pendingLocustData = new List<(string code, byte[] data)>();
+                for (int i = 0; i < count; i++)
+                {
+                    string code = tree.GetString($"locust_{i}_code");
+                    byte[] data = tree.GetBytes($"locust_{i}_data");
 
-                if (string.IsNullOrEmpty(code) || data == null) continue;
+                    if (string.IsNullOrEmpty(code) || data == null) continue;
+                    pendingLocustData.Add((code, data));
+                }
+            }
+            else
+            {
+                // Api is available, deserialize directly
+                locusts.Clear();
+                for (int i = 0; i < count; i++)
+                {
+                    string code = tree.GetString($"locust_{i}_code");
+                    byte[] data = tree.GetBytes($"locust_{i}_data");
 
-                var etype = Api.World.GetEntityType(new AssetLocation(code));
-                if (etype == null) continue;
+                    if (string.IsNullOrEmpty(code) || data == null) continue;
 
-                var locust = Api.World.ClassRegistry.CreateEntity(etype) as EntityLocust;
-                if (locust == null) continue;
+                    var etype = Api.World.GetEntityType(new AssetLocation(code));
+                    if (etype == null) continue;
 
-                SerializerUtil.FromBytes(data, (reader) => locust.FromBytes(reader, false));
-                locusts.Add(locust); // Add to set but DON'T spawn - they're stored
+                    var locust = Api.World.ClassRegistry.CreateEntity(etype) as EntityLocust;
+                    if (locust == null) continue;
+
+                    SerializerUtil.FromBytes(data, (reader) => locust.FromBytes(reader, false));
+                    locusts.Add(locust); // Add to set but DON'T spawn - they're stored
+                }
             }
         }
 
