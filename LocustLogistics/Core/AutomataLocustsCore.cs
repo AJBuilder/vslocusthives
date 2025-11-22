@@ -4,10 +4,13 @@ using LocustLogistics.Core.BlockEntities;
 using LocustLogistics.Core.EntityBehaviors;
 using LocustLogistics.Core.Interfaces;
 using LocustLogistics.Core.Items;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
@@ -29,9 +32,9 @@ namespace LocustLogistics.Core
         Dictionary<int, HashSet<ILocustNest>> hiveNests = new Dictionary<int, HashSet<ILocustNest>>();
 
         public IReadOnlyDictionary<IHiveMember, int> AllMembers => allMembers;
-        public IReadOnlyDictionary<int, IReadOnlyCollection<IHiveMember>> HiveMembers => (IReadOnlyDictionary<int, IReadOnlyCollection<IHiveMember>>)hiveMembers;
-        public IReadOnlyDictionary<int, IReadOnlyCollection<ILocustNest>> HiveNests => (IReadOnlyDictionary<int, IReadOnlyCollection<ILocustNest>>)hiveNests;
 
+        public IReadOnlySet<IHiveMember> GetHiveMembers(int hive) => hiveMembers[hive];
+        public IReadOnlySet<ILocustNest> GetHiveNests(int hive) => hiveNests[hive];
 
         public override void Start(ICoreAPI api)
         {
@@ -126,6 +129,76 @@ namespace LocustLogistics.Core
             // Post increment for the next time.
             return nextId++;
         }
+        public override void AssetsFinalize(ICoreAPI api)
+        {
+            // Only run on server side to prevent double-patching
+            if (api.Side != EnumAppSide.Server)
+            {
+                return;
+            }
 
+            PatchHackedLocust(api);
+        }
+
+        private void PatchHackedLocust(ICoreAPI api)
+        {
+            // Find the locust-hacked entity
+            var locustEntity = api.World.EntityTypes.FirstOrDefault(e =>
+                e.Code.Path.Contains("locust") &&
+                e.Variant.ContainsKey("state") &&
+                e.Variant["state"] == "hacked");
+
+            if (locustEntity == null)
+            {
+                api.Logger.Warning("[LocustLogistics] Could not find locust-hacked entity to patch");
+                return;
+            }
+
+            // Find and patch the taskai behavior
+            PatchTaskAiBehavior(api, locustEntity);
+        }
+
+        private void PatchTaskAiBehavior(ICoreAPI api, EntityProperties entity)
+        {
+            // Find the taskai behavior by searching for its code
+            var taskAiBehavior = entity.Server?.BehaviorsAsJsonObj.FirstOrDefault(b =>
+            {
+                var code = b["code"];
+                if (code.Exists)
+                {
+                    if ("taskai" == code.AsString()) return true;
+                    
+                }
+                return false;
+            });
+
+            if (!taskAiBehavior.Exists)
+            {
+                api.Logger.Warning("[LocustLogistics] Could not find taskai behavior in locust-hacked entity");
+                return;
+            }
+
+            // Get the aitasks array
+            var aiTasksArray = taskAiBehavior["aitasks"];
+
+            if (!aiTasksArray.Exists)
+            {
+                api.Logger.Warning("[LocustLogistics] Could not find taskai task array in locust-hacked entity");
+                return;
+            }
+
+            // Create the returnToNest task
+            var taskConfig = new JObject
+            {
+                ["code"] = "returnToNest",
+                ["priority"] = 0.5,
+                ["mincooldown"] = 5000,
+                ["maxcooldown"] = 15000
+            };
+
+            (aiTasksArray.Token as JArray)?.Add(taskConfig);
+
+            api.Logger.Notification("[LocustLogistics] Added returnToNest AI task to locust-hacked entity");
+        }
     }
 }

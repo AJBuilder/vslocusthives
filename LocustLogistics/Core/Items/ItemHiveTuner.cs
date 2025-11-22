@@ -7,6 +7,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
+using Vintagestory.GameContent;
 
 namespace LocustLogistics.Core.Items
 {
@@ -137,6 +138,12 @@ namespace LocustLogistics.Core.Items
                         if (hiveId.HasValue)
                         {
                             modSystem.Tune(hiveId.Value, target);
+
+                            // Not sure I like this logic here...
+                            // Let's clear the guarded Player/Entity when tuning to a new hive
+                            entitySel?.Entity.WatchedAttributes.RemoveAttribute("guardedPlayerUid");
+                            entitySel?.Entity.WatchedAttributes.RemoveAttribute("guardedEntityId");
+                            entitySel?.Entity.WatchedAttributes.RemoveAttribute("guardedName");
                         }
                         else if (api is ICoreClientAPI capi)
                         {
@@ -145,6 +152,13 @@ namespace LocustLogistics.Core.Items
                         break;
                     case HiveTunerMode.Zero:
                         modSystem.Tune(null, target);
+
+                        // Not sure I like this logic here...
+                        // But let's just set the guardedPlayer or guardedEntity whenever we zero
+                        var player = byEntity as EntityPlayer;
+                        if (player != null) entitySel?.Entity.WatchedAttributes.SetString("guardedPlayerUid", player.PlayerUID);
+                        else entitySel?.Entity.WatchedAttributes.SetLong("guardedEntityId", byEntity.EntityId);
+                        entitySel?.Entity.WatchedAttributes.SetString("guardedName", byEntity.GetName() ?? "");
                         break;
                 }
             }

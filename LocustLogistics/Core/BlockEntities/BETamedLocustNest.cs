@@ -129,6 +129,7 @@ namespace LocustLogistics.Core.BlockEntities
 
         public override void GetBlockInfo(IPlayer forPlayer, StringBuilder dsc)
         {
+            dsc.AppendLine($"Locusts: {locusts.Count}/{MaxCapacity}");
             dsc.AppendLine($"Hive: {(hiveId.HasValue ? hiveId.Value : "None")}");
         }
 

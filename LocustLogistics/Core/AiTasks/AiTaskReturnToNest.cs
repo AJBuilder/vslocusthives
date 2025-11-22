@@ -24,7 +24,7 @@ namespace LocustLogistics.Core.AiTasks
         public string Id => "returnToNest";
         public int Slot => 0;
         public float Priority => priority;
-        public float PriorityForCancel => priority;
+        public float PriorityForCancel => 1.35f;
         public string ProfilerName { get; set; }
 
         public AiTaskReturnToNest(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig)
@@ -42,6 +42,10 @@ namespace LocustLogistics.Core.AiTasks
 
             pathTraverser = entity.GetBehavior<EntityBehaviorTaskAI>().PathTraverser;
             modSystem = entity.Api.ModLoader.GetModSystem<AutomataLocustsCore>();
+        }
+
+        public void AfterInitialize()
+        {
             member = entity as IHiveMember;
             if (member == null)
             {
@@ -53,19 +57,18 @@ namespace LocustLogistics.Core.AiTasks
             }
         }
 
-        public void AfterInitialize()
-        {
-        }
-
         public bool ShouldExecute()
         {
-            if (member == null || !modSystem.AllMembers.TryGetValue(member, out var hive)) return false;
+            if (member == null ||
+                entity.WatchedAttributes.HasAttribute("guardedPlayerUid") ||
+                entity.WatchedAttributes.HasAttribute("guardedEntityId") ||
+                !modSystem.AllMembers.TryGetValue(member, out var hive)) return false;
 
             // Find nearest nest with room
             ILocustNest nearest = null;
             double minDistSq = double.MaxValue;
 
-            foreach (var nest in modSystem.HiveNests[hive])
+            foreach (var nest in modSystem.GetHiveNests(hive))
             {
                 if (!nest.HasRoom) continue;
 
@@ -103,7 +106,7 @@ namespace LocustLogistics.Core.AiTasks
 
         public bool CanContinueExecute()
         {
-            return pathfindingActive && targetNest != null && targetNest.HasRoom;
+            return !pathfindingActive && targetNest != null && targetNest.HasRoom;
         }
 
         public bool ContinueExecute(float dt)
