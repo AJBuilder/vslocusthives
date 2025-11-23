@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using LocustLogistics.Core.AiTasks;
 using LocustLogistics.Core.BlockEntities;
+using LocustLogistics.Core.Blocks;
 using LocustLogistics.Core.EntityBehaviors;
 using LocustLogistics.Core.Interfaces;
 using LocustLogistics.Core.Items;
@@ -29,18 +30,19 @@ namespace LocustLogistics.Core
         int nextId;
         Dictionary<IHiveMember, int> allMembers = new Dictionary<IHiveMember, int>();
         Dictionary<int, HashSet<IHiveMember>> hiveMembers = new Dictionary<int, HashSet<IHiveMember>>();
-        Dictionary<int, HashSet<ILocustNest>> hiveNests = new Dictionary<int, HashSet<ILocustNest>>();
+        Dictionary<int, HashSet<BETamedLocustNest>> hiveNests = new Dictionary<int, HashSet<BETamedLocustNest>>();
 
         public IReadOnlyDictionary<IHiveMember, int> AllMembers => allMembers;
 
         public IReadOnlySet<IHiveMember> GetHiveMembers(int hive) => hiveMembers[hive];
-        public IReadOnlySet<ILocustNest> GetHiveNests(int hive) => hiveNests[hive];
+        public IReadOnlySet<BETamedLocustNest> GetHiveNests(int hive) => hiveNests[hive];
 
         public override void Start(ICoreAPI api)
         {
             api.RegisterItemClass("ItemHiveTuner", typeof(ItemHiveTuner));
             api.RegisterEntityBehaviorClass("hivetunable", typeof(EntityBehaviorHiveTunable));
             api.RegisterBlockEntityClass("TamedLocustNest", typeof(BETamedLocustNest));
+            api.RegisterBlockClass("BlockTamedLocustNest", typeof(BlockTamedLocustNest));
         }
 
         public override void StartServerSide(ICoreServerAPI api)
@@ -74,7 +76,7 @@ namespace LocustLogistics.Core
                 }
 
                 // Cleanup nest caching
-                if (member is ILocustNest nest)
+                if (member is BETamedLocustNest nest)
                 {
                     if (hiveNests.TryGetValue(prevHive, out var nests))
                     {
@@ -97,11 +99,11 @@ namespace LocustLogistics.Core
                 }
                 members.Add(member);
 
-                if (member is ILocustNest nest)
+                if (member is BETamedLocustNest nest)
                 {
                     if (!hiveNests.TryGetValue(val, out var nests))
                     {
-                        nests = new HashSet<ILocustNest>();
+                        nests = new HashSet<BETamedLocustNest>();
                         hiveNests[val] = nests;
                     }
                     nests.Add(nest);
@@ -193,7 +195,8 @@ namespace LocustLogistics.Core
                 ["code"] = "returnToNest",
                 ["priority"] = 0.5,
                 ["mincooldown"] = 5000,
-                ["maxcooldown"] = 15000
+                ["maxcooldown"] = 15000,
+                ["travellingAnimation"] = "walk"
             };
 
             (aiTasksArray.Token as JArray)?.Add(taskConfig);

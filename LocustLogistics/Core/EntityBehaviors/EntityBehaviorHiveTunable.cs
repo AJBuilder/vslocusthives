@@ -50,7 +50,7 @@ namespace LocustLogistics.Core.EntityBehaviors
             if ((id.HasValue != hiveId.HasValue) ||
                 ((id.HasValue && hiveId.HasValue) && id != hiveId)) modSystem?.Tune(id, this);
 
-            // hiveId will get set again in OnTuned. Eh.
+            // hiveId is already set in OnTuned. Eh.
             // This way we don't need a second variable just
             // for getting this id to Initialize.
             hiveId = id;

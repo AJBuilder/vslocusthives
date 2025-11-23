@@ -1,9 +1,11 @@
+using LocustLogistics.Core.BlockEntities;
 using LocustLogistics.Core.EntityBehaviors;
 using LocustLogistics.Core.Interfaces;
 using System;
 using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.Essentials;
 using Vintagestory.GameContent;
@@ -16,7 +18,7 @@ namespace LocustLogistics.Core.AiTasks
         EntityAgent entity;
         AnimationMetaData travellingAnimation;
         WaypointsTraverser pathTraverser;
-        ILocustNest targetNest;
+        BETamedLocustNest targetNest;
         bool pathfindingActive;
         AutomataLocustsCore modSystem;
         IHiveMember member;
@@ -26,6 +28,8 @@ namespace LocustLogistics.Core.AiTasks
         public float Priority => priority;
         public float PriorityForCancel => 1.35f;
         public string ProfilerName { get; set; }
+
+        public long UnstoredMs { get; set; }
 
         public AiTaskReturnToNest(EntityAgent entity, JsonObject taskConfig, JsonObject aiConfig)
         {
@@ -62,10 +66,11 @@ namespace LocustLogistics.Core.AiTasks
             if (member == null ||
                 entity.WatchedAttributes.HasAttribute("guardedPlayerUid") ||
                 entity.WatchedAttributes.HasAttribute("guardedEntityId") ||
+                (entity.Attributes.GetLong("unstoredMs") + 1000 > entity.Api.World.ElapsedMilliseconds) ||
                 !modSystem.AllMembers.TryGetValue(member, out var hive)) return false;
 
             // Find nearest nest with room
-            ILocustNest nearest = null;
+            BETamedLocustNest nearest = null;
             double minDistSq = double.MaxValue;
 
             foreach (var nest in modSystem.GetHiveNests(hive))
@@ -96,9 +101,9 @@ namespace LocustLogistics.Core.AiTasks
             }
 
             pathTraverser.NavigateTo_Async(
-                targetNest.Position,
-                1.0f,  // minDist
-                1.1f,  // maxDist
+                targetNest.Pos.ToVec3d(),
+                0.02f,
+                1.0f,
                 OnGoalReached,
                 OnStuck
             );
@@ -111,6 +116,9 @@ namespace LocustLogistics.Core.AiTasks
 
         public bool ContinueExecute(float dt)
         {
+            targetNest = entity.Api.World.BlockAccessor.GetBlockEntity<BETamedLocustNest>(targetNest.Pos);
+            if (targetNest == null) return false;
+
             return pathfindingActive;
         }
 
@@ -124,9 +132,11 @@ namespace LocustLogistics.Core.AiTasks
                 entity.AnimManager?.StopAnimation(travellingAnimation.Code);
             }
 
-            if (!cancelled && targetNest != null)
+            var inrange = entity.Pos.InRangeOf(targetNest.Pos, 1.5f);
+            if (!cancelled && inrange)
             {
-                targetNest.TryStoreLocust(entity as EntityLocust);
+                targetNest = entity.Api.World.BlockAccessor.GetBlockEntity<BETamedLocustNest>(targetNest.Pos);
+                targetNest?.TryStoreLocust(entity as EntityLocust);
             }
 
             targetNest = null;

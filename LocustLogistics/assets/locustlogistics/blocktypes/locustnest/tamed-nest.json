@@ -1,9 +1,10 @@
 {
   "code": "locustnest-cage-tamed",
+  "class": "BlockTamedLocustNest",
   "entityClass": "TamedLocustNest",
   "creativeinventory": {
     "general": [ "*" ],
-    "special":  ["*"]
+    "special": [ "*" ]
   },
   "blockmaterial": "Metal",
   "drawtype": "json",

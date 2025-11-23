@@ -1,4 +1,5 @@
-﻿using LocustLogistics.Core;
+﻿using HarmonyLib;
+using LocustLogistics.Core;
 using LocustLogistics.Core.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -9,26 +10,36 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using Vintagestory.GameContent;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LocustLogistics.Core.BlockEntities
 {
-    public class BETamedLocustNest : BlockEntity, ILocustNest
+    public class BETamedLocustNest : BlockEntity, IHiveMember
     {
         int? hiveId;
         AutomataLocustsCore modSystem;
-        HashSet<EntityLocust> locusts;
-        List<(string code, byte[] data)> pendingLocustData;
+        List<(string code, byte[] data)> storedLocustData;
 
         public BETamedLocustNest()
         {
-            locusts = new HashSet<EntityLocust>();
+            storedLocustData = new List<(string code, byte[] data)>();
         }
 
-        public IReadOnlyCollection<EntityLocust> StoredLocusts => locusts;
+        public IEnumerable<EntityLocust> StoredLocusts
+        {
+            get
+            {
+                if (Api == null) yield break;
+
+                foreach (var (code, data) in storedLocustData) yield return CreateEntityClass(code, data);
+            }
+        }
+
         public int MaxCapacity => 5;
-        public bool HasRoom => locusts.Count < MaxCapacity;
+        public bool HasRoom => storedLocustData.Count < MaxCapacity;
 
         public Vec3d Position => Pos.ToVec3d();
 
@@ -38,23 +49,6 @@ namespace LocustLogistics.Core.BlockEntities
         {
             base.Initialize(api);
             modSystem = api.ModLoader.GetModSystem<AutomataLocustsCore>();
-
-            // Deserialize any pending locust data from FromTreeAttributes
-            if (pendingLocustData != null)
-            {
-                foreach (var (code, data) in pendingLocustData)
-                {
-                    var etype = api.World.GetEntityType(new AssetLocation(code));
-                    if (etype == null) continue;
-
-                    var locust = api.World.ClassRegistry.CreateEntity(etype) as EntityLocust;
-                    if (locust == null) continue;
-
-                    SerializerUtil.FromBytes(data, (reader) => locust.FromBytes(reader, false));
-                    locusts.Add(locust);
-                }
-                pendingLocustData = null;
-            }
 
             if (!hiveId.HasValue) hiveId = modSystem.CreateHive();
             modSystem.Tune(hiveId, this);
@@ -74,27 +68,49 @@ namespace LocustLogistics.Core.BlockEntities
 
         public bool TryStoreLocust(EntityLocust locust)
         {
-            if (locusts.Count >= MaxCapacity) return false;
-            if (!locusts.Add(locust)) return false; // Already stored
+            if (storedLocustData.Count >= MaxCapacity) return false;
 
-            // We co-opt the reason "PickedUp" because all the others happen
-            // when the entity should "no longer exist". "PickedUp" implies that
-            // this despawned but still exists, just not in the world.
-            // i.e. picked up and stored in a nest.
+            // Serialize the locust to raw data
+            byte[] data = SerializerUtil.ToBytes((writer) => locust.ToBytes(writer, false));
+            string code = locust.Code.ToString();
+
+            storedLocustData.Add((code, data));
+
+            // Despawn the locust from the world
             locust.Die(EnumDespawnReason.PickedUp, null);
+
             MarkDirty(true);
             return true;
         }
 
-        public bool TryUnstoreLocust(EntityLocust locust)
+        public bool TryUnstoreLocust(int index)
         {
-            if (!locusts.Remove(locust)) return false; // Not in storage
+            if (index < 0 || index >= storedLocustData.Count) return false;
 
-            locust.ServerPos.SetPos(Pos.ToVec3d().Add(0.5, 0.1, 0.5));
-            locust.Pos.SetFrom(locust.ServerPos);
-            Api.World.SpawnEntity(locust);
+            // Get and remove the raw data entry
+            var (code, data) = storedLocustData[index];
+            storedLocustData.RemoveAt(index);
+
+            // Create a fresh EntityLocust from the raw data
+            var entity = CreateEntityClass(code, data);
+
+            // Spawn the entity at the nest position
+            entity.Pos.SetFrom(entity.ServerPos);
+            entity.ServerPos.SetPosWithDimension(Pos.ToVec3d());
+            Api.World.SpawnEntity(entity);
+
+            entity.Attributes.SetLong("unstoredMs", Api.World.ElapsedMilliseconds);
+
             MarkDirty(true);
             return true;
+        }
+
+        private EntityLocust CreateEntityClass(string code, byte[] bytes)
+        {
+            var entityType = Api.World.GetEntityType(new AssetLocation(code));
+            var entity = Api.World.ClassRegistry.CreateEntity(entityType) as EntityLocust;
+            SerializerUtil.FromBytes(bytes, (reader) => entity.FromBytes(reader, false));
+            return entity;
         }
 
         public override void ToTreeAttributes(ITreeAttribute tree)
@@ -102,15 +118,13 @@ namespace LocustLogistics.Core.BlockEntities
             base.ToTreeAttributes(tree);
             if (hiveId.HasValue) tree.SetInt("hiveId", hiveId.Value);
 
-            int i = 0;
-            foreach (var locust in locusts)
+            for (int i = 0; i < storedLocustData.Count; i++)
             {
-                byte[] data = SerializerUtil.ToBytes((writer) => locust.ToBytes(writer, false));
+                var (code, data) = storedLocustData[i];
                 tree.SetBytes($"locust_{i}_data", data);
-                tree.SetString($"locust_{i}_code", locust.Code.ToString());
-                i++;
+                tree.SetString($"locust_{i}_code", code);
             }
-            tree.SetInt("locustCount", i);
+            tree.SetInt("locustCount", storedLocustData.Count);
         }
 
         public override void FromTreeAttributes(ITreeAttribute tree, IWorldAccessor worldAccessForResolve)
@@ -122,52 +136,26 @@ namespace LocustLogistics.Core.BlockEntities
             if ((id.HasValue != hiveId.HasValue) ||
                 ((id.HasValue && hiveId.HasValue) && id != hiveId)) modSystem?.Tune(id, this);
 
-            // hiveId will get set again in OnTuned. Eh.
+            // hiveId is already set in OnTuned. Eh.
             // This way we don't need a second variable just
             // for getting this id to Initialize.
             hiveId = id;
 
             int count = tree.GetInt("locustCount");
 
-            // If Api is not available yet, store raw data for later deserialization in Initialize
-            if (Api == null)
-            {
-                pendingLocustData = new List<(string code, byte[] data)>();
-                for (int i = 0; i < count; i++)
-                {
-                    string code = tree.GetString($"locust_{i}_code");
-                    byte[] data = tree.GetBytes($"locust_{i}_data");
-
-                    if (string.IsNullOrEmpty(code) || data == null) continue;
-                    pendingLocustData.Add((code, data));
-                }
-            }
-            else
-            {
-                // Api is available, deserialize directly
-                locusts.Clear();
-                for (int i = 0; i < count; i++)
-                {
-                    string code = tree.GetString($"locust_{i}_code");
-                    byte[] data = tree.GetBytes($"locust_{i}_data");
-
-                    if (string.IsNullOrEmpty(code) || data == null) continue;
-
-                    var etype = Api.World.GetEntityType(new AssetLocation(code));
-                    if (etype == null) continue;
-
-                    var locust = Api.World.ClassRegistry.CreateEntity(etype) as EntityLocust;
-                    if (locust == null) continue;
-
-                    SerializerUtil.FromBytes(data, (reader) => locust.FromBytes(reader, false));
-                    locusts.Add(locust); // Add to set but DON'T spawn - they're stored
-                }
-            }
+            storedLocustData = Enumerable.Range(0, count)
+                .Select(i => (
+                    code: tree.GetString($"locust_{i}_code"),
+                    data: tree.GetBytes($"locust_{i}_data")
+                ))
+                .Where(x => !string.IsNullOrEmpty(x.code) && x.data != null)
+                .ToList();
         }
+
 
         public override void GetBlockInfo(IPlayer forPlayer, StringBuilder dsc)
         {
-            dsc.AppendLine($"Locusts: {locusts.Count}/{MaxCapacity}");
+            dsc.AppendLine($"Locusts: {storedLocustData.Count}/{MaxCapacity}");
             dsc.AppendLine($"Hive: {(hiveId.HasValue ? hiveId.Value : "None")}");
         }
 
