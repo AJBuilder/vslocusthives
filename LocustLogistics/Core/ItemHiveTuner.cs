@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LocustLogistics.Util;
+using System;
 using System.Linq;
 using System.Text;
 using Vintagestory.API.Client;
@@ -74,12 +75,7 @@ namespace LocustLogistics.Core
                     BlockEntity be = byEntity.World.BlockAccessor.GetBlockEntity(onBlockPos);
                     if(be != null)
                     {
-                        target = be as IHiveMember;
-                        if (target == null)
-                        {
-                            target = be.GetBehavior<IHiveMember>();
-                        }
-
+                        target = be.GetAs<IHiveMember>();
                         if (target != null)
                         {
                             be.MarkDirty();
@@ -89,15 +85,7 @@ namespace LocustLogistics.Core
             }
             else if (entitySel != null)
             {
-                target = entitySel.Entity as IHiveMember;
-                if (target == null)
-                {
-                    target = entitySel.Entity
-                            .SidedProperties
-                            .Behaviors
-                            .OfType<IHiveMember>()
-                            .FirstOrDefault();
-                }
+                target = entitySel.Entity.GetAs<IHiveMember>();
             }
 
             var attributes = slot.Itemstack.Attributes;

@@ -8,10 +8,14 @@ using Vintagestory.API.Common;
 
 namespace LocustLogistics.Logistics.Retrieval
 {
-    public class RetrievalRequest
+    /// <summary>
+    /// A handle object used to simplify the interaction between the push logistics system and storages.
+    /// </summary>
+    public class PushRequest
     {
         bool completed;
         bool failed;
+        bool cancelled;
 
         public event Action CompletedEvent;
         public event Action AbandonedEvent;
@@ -21,10 +25,12 @@ namespace LocustLogistics.Logistics.Retrieval
         public IHiveStorage From { get; }
 
         public bool Completed => completed;
-
         public bool Failed => failed;
+        public bool Cancelled => cancelled;
 
-        public RetrievalRequest(ItemStack stack, IHiveStorage from)
+        public bool Active => !(completed || failed || cancelled);
+
+        public PushRequest(ItemStack stack, IHiveStorage from)
         {
             Stack = stack;
             From = from;
@@ -35,31 +41,34 @@ namespace LocustLogistics.Logistics.Retrieval
         /// </summary>
         public void Complete()
         {
-            if (!Failed && !Completed)
+            if (Active)
             {
                 CompletedEvent?.Invoke();
+                completed = true;
             }
         }
         public void Abandon()
         {
-            if (!Failed && !Completed)
+            if (Active)
             {
                 AbandonedEvent?.Invoke();
             }
         }
         public void Fail()
         {
-            if (!Failed && !Completed)
+            if (Active)
             {
                 FailedEvent?.Invoke();
+                failed = true;
             }
         }
 
         public void Cancel()
         {
-            if (!Failed && !Completed)
+            if (Active)
             {
                 CancelledEvent?.Invoke();
+                cancelled = true;
             }
         }
 

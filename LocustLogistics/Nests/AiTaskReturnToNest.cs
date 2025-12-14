@@ -100,13 +100,15 @@ namespace LocustLogistics.Nests
 
         public override bool ContinueExecute(float dt)
         {
+            if (!base.ContinueExecute(dt)) return false;
+
             // Bail if targetNest is no longer part of the hive, this entity is no longer a member, or their membership no longer matches.
             var nestIsTuned = nestMembership.TryGetValue(targetNest, out var nestHive);
             var thisIsTuned = membership.TryGetValue(member, out var memberHive);
             if (!nestIsTuned || !thisIsTuned || nestHive != memberHive) return false;
 
             // Finish if no longer pathfinding.
-            return pathfindingActive && base.ContinueExecute(dt);
+            return pathfindingActive;
         }
 
         public override void FinishExecute(bool cancelled)

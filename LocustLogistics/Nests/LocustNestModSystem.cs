@@ -81,11 +81,6 @@ namespace LocustLogistics.Core
                 return;
             }
 
-            PatchHackedLocust(api);
-        }
-
-        private void PatchHackedLocust(ICoreAPI api)
-        {
             // Find the locust-hacked entity
             var locustEntity = api.World.EntityTypes.FirstOrDefault(e =>
                 e.Code.Path.Contains("locust") &&
@@ -98,20 +93,14 @@ namespace LocustLogistics.Core
                 return;
             }
 
-            // Find and patch the taskai behavior
-            PatchTaskAiBehavior(api, locustEntity);
-        }
-
-        private void PatchTaskAiBehavior(ICoreAPI api, EntityProperties entity)
-        {
             // Find the taskai behavior by searching for its code
-            var taskAiBehavior = entity.Server?.BehaviorsAsJsonObj.FirstOrDefault(b =>
+            var taskAiBehavior = locustEntity.Server?.BehaviorsAsJsonObj.FirstOrDefault(b =>
             {
                 var code = b["code"];
                 if (code.Exists)
                 {
                     if ("taskai" == code.AsString()) return true;
-                    
+
                 }
                 return false;
             });

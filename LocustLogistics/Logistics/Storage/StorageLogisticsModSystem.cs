@@ -11,7 +11,7 @@ using Vintagestory.GameContent;
 
 namespace LocustLogistics.Logistics.Storage
 {
-    public class StorageModSystem : ModSystem
+    public class StorageLogisticsModSystem : ModSystem
     {
 
         Dictionary<IHiveStorage, int> allTunedStorages = new Dictionary<IHiveStorage, int>();
@@ -27,13 +27,11 @@ namespace LocustLogistics.Logistics.Storage
 
         public override void Start(ICoreAPI api)
         {
-            api.RegisterBlockEntityBehaviorClass("HiveStorageBeacon", typeof(BEBehaviorHiveStorageBeacon));
-            api.RegisterBlockClass("BlockHiveStorageBeacon", typeof(BlockHiveStorageBeacon));
+            api.RegisterBlockEntityBehaviorClass("HiveAccessPort", typeof(BEBehaviorHiveAccessPort));
         }
         public override void StartServerSide(ICoreServerAPI api)
         {
             base.StartServerSide(api);
-            AiTaskRegistry.Register<AiTaskHiveWorkerRetrieve>("retrieveHiveStack");
         }
 
         public void UpdateStorageHiveMembership(IHiveStorage storage, int? prevHive, int? hive)

@@ -11,15 +11,15 @@ namespace LocustLogistics.Logistics
     public class LogisticsWorkersModSystem : ModSystem
     {
 
-        Dictionary<IHiveLogisticsWorker, int> allTunedWorkers = new Dictionary<IHiveLogisticsWorker, int>();
-        Dictionary<int, HashSet<IHiveLogisticsWorker>> hiveWorkers = new Dictionary<int, HashSet<IHiveLogisticsWorker>>();
+        Dictionary<ILogisticsWorker, int> allTunedWorkers = new Dictionary<ILogisticsWorker, int>();
+        Dictionary<int, HashSet<ILogisticsWorker>> hiveWorkers = new Dictionary<int, HashSet<ILogisticsWorker>>();
 
-        public IReadOnlyDictionary<IHiveLogisticsWorker, int> Membership => allTunedWorkers;
+        public IReadOnlyDictionary<ILogisticsWorker, int> Membership => allTunedWorkers;
 
-        public IReadOnlySet<IHiveLogisticsWorker> GetHiveWorkers(int hive)
+        public IReadOnlySet<ILogisticsWorker> GetHiveWorkers(int hive)
         {
             if (hiveWorkers.TryGetValue(hive, out var workers)) return workers;
-            else return new HashSet<IHiveLogisticsWorker>();
+            else return new HashSet<ILogisticsWorker>();
         }
 
         public override void Start(ICoreAPI api)
@@ -27,7 +27,7 @@ namespace LocustLogistics.Logistics
             api.RegisterEntityBehaviorClass("hivelogisticsworker", typeof(EntityBehaviorLogisticsWorker));
         }
 
-        public void UpdateLogisticsWorkerHiveMembership(IHiveLogisticsWorker worker, int? prevHive, int? hive)
+        public void UpdateLogisticsWorkerHiveMembership(ILogisticsWorker worker, int? prevHive, int? hive)
         {
             if (hive.HasValue) allTunedWorkers[worker] = hive.Value;
             else allTunedWorkers.Remove(worker);
@@ -47,7 +47,7 @@ namespace LocustLogistics.Logistics
             {
                 if (!hiveWorkers.TryGetValue(hive.Value, out var workers))
                 {
-                    workers = new HashSet<IHiveLogisticsWorker>();
+                    workers = new HashSet<ILogisticsWorker>();
                     hiveWorkers[hive.Value] = workers;
                 }
                 workers.Add(worker);

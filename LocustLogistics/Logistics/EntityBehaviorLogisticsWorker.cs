@@ -12,12 +12,10 @@ using Vintagestory.API.MathTools;
 
 namespace LocustLogistics.Logistics
 {
-    public class EntityBehaviorLogisticsWorker : EntityBehavior, IHiveLogisticsWorker
+    public class EntityBehaviorLogisticsWorker : EntityBehavior, ILogisticsWorker
     {
-        RetrievalRequest retrievalRequest;
         public IInventory Inventory { get; }
         public Vec3d Position => entity.Pos.XYZ;
-        public RetrievalRequest AssignedRetrievalRequest { get; }
 
         public EntityBehaviorLogisticsWorker(Entity entity) : base(entity)
         {
@@ -45,18 +43,14 @@ namespace LocustLogistics.Logistics
 
         public override string PropertyName()
         {
-            return "hivelogisticsworker";
+            return "logisticsworker";
         }
 
-        public bool TryAssignRetrievalRequest(RetrievalRequest request)
+        public bool TryAssignPushRequest(PushRequest request)
         {
             // NOTE: This logic assumes empty == can't take more items. Ok for now, technically incorrect.
-            if (retrievalRequest != null || !Inventory.Empty) return false;
-            retrievalRequest = request;
-            request.CancelledEvent += () =>
-                {
-                    retrievalRequest = null;
-                };
+            // If we want to support merging stacks or having more than one slot, will have to change.
+            if (!Inventory.Empty) return false;
             return true;
         }
 

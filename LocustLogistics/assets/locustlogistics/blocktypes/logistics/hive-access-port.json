@@ -1,0 +1,70 @@
+{
+  "code": "hiveaccessport",
+  "behaviors": [
+    {
+      "name": "OmniAttachable",
+      "properties": { "facingCode": "position" }
+    }
+  ],
+  "entityBehaviors": [
+    { "name": "HiveTunable" },
+    { "name": "HiveAccessPort" }
+  ],
+  "variantgroups": [
+    {
+      "code": "position",
+      "loadFromPropertiesCombine": [ "abstract/horizontalorientation", "abstract/verticalorientation" ]
+    }
+  ],
+  "creativeinventory": {
+    "general": [ "*-north" ]
+  },
+  "blockmaterial": "Metal",
+  "drawtype": "json",
+  "shapebytype": {
+    "*-up": {
+      "base": "block/hive-access-port",
+      "rotateX": -90
+    },
+    "*-down": {
+      "base": "block/hive-access-port",
+      "rotateX": 90
+    },
+    "*-north": {
+      "base": "block/hive-access-port",
+      "rotateY": 180
+    },
+    "*-east": {
+      "base": "block/hive-access-port",
+      "rotateY": 90
+    },
+    "*-south": {
+      "base": "block/hive-access-port"
+    },
+    "*-west": {
+      "base": "block/hive-access-port",
+      "rotateY": -90
+    }
+  },
+  "textures": {
+    "cloth": { "base": "game:block/locustnest/stalagmite/fabric-small" },
+    "frame": { "base": "game:block/metal/plate/iron" },
+    "frameinner": { "base": "game:block/wood-generic" }
+  },
+  "lightAbsorption": 0,
+  "sidesolid": { "all": false },
+  "sideopaque": { "all": false },
+  "replaceable": 300,
+  "resistance": 20,
+  "materialDensity": 300,
+  "drops": [
+    {
+      "type": "block",
+      "code": "hiveaccessport-north",
+      "quantity": {
+        "avg": 1,
+        "var": 0
+      }
+    }
+  ]
+}

@@ -11,11 +11,17 @@ using Vintagestory.API.MathTools;
 
 namespace LocustLogistics.Logistics
 {
-    public interface IHiveLogisticsWorker
+    public interface ILogisticsWorker
     {
         IInventory Inventory { get; }
         Vec3d Position { get; }
-        public bool TryAssignRetrievalRequest(RetrievalRequest request);
+
+        /// <summary>
+        /// If returns try, then the given request will be assigned to this worker.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        public bool TryAssignPushRequest(PushRequest request);
 
     }
 }
