@@ -1,0 +1,24 @@
+{
+  "code": "locustnest-cage-tamed",
+  "class": "BlockTamedLocustNest",
+  "entityBehaviors": [
+    { "name": "HiveLocustNest" },
+    {
+      "name": "HiveTunable",
+      "properties": { "createsHive": true }
+    }
+  ],
+  "creativeinventory": {
+    "general": [ "*" ],
+    "special": [ "*" ]
+  },
+  "blockmaterial": "Metal",
+  "drawtype": "json",
+  "shape": { "base": "game:block/locustnest/cage/cage1" },
+  "lightAbsorption": 0,
+  "sidesolid": { "all": false },
+  "sideopaque": { "all": false },
+  "replaceable": 300,
+  "resistance": 20,
+  "materialDensity": 300
+}

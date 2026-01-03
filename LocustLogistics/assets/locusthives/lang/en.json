@@ -1,0 +1,13 @@
+{
+    "hello": "hello world!",
+
+    "locusthives:hive-storage-settings": "Hive Storage Settings",
+    "locusthives:tab-storage": "Storage",
+    "locusthives:tab-request": "Request",
+    "locusthives:tab-push": "Push",
+    "locusthives:request-mode-quota": "Quota Mode",
+    "locusthives:add-request": "Add Request",
+    "locusthives:request-list-placeholder": "Request list (to be implemented)",
+    "locusthives:enable-push-mode": "Enable Push Mode",
+    "locusthives:select-item": "Select Item"
+}

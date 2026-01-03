@@ -1,0 +1,125 @@
+{
+  "code": "hiveaccessport",
+  "behaviors": [
+    {
+      "name": "OmniRotatable",
+      "properties": {
+        "rotateSides": true,
+        "facing": "block"
+      }
+    }
+  ],
+  "entityBehaviors": [
+    { "name": "HiveTunable" },
+    {
+      "name": "HiveAccessPort",
+      "properties": { "facingCode": "rot" }
+    }
+  ],
+  "variantgroups": [
+    {
+      "code": "rot",
+      "loadFromPropertiesCombine": [ "abstract/horizontalorientation", "abstract/verticalorientation" ]
+    }
+  ],
+  "creativeinventory": {
+    "general": [ "*-north" ]
+  },
+  "blockmaterial": "Metal",
+  "drawtype": "json",
+  "shapebytype": {
+    "*-up": {
+      "base": "block/hive-access-port",
+      "rotateX": -90
+    },
+    "*-down": {
+      "base": "block/hive-access-port",
+      "rotateX": 90
+    },
+    "*-north": {
+      "base": "block/hive-access-port"
+    },
+    "*-east": {
+      "base": "block/hive-access-port",
+      "rotateY": -90
+    },
+    "*-south": {
+      "base": "block/hive-access-port",
+      "rotateY": 180
+    },
+    "*-west": {
+      "base": "block/hive-access-port",
+      "rotateY": 90
+    }
+  },
+  "textures": {
+    "cloth": { "base": "game:block/locustnest/stalagmite/fabric-small" },
+    "frame": { "base": "game:block/metal/plate/iron" },
+    "frameinner": { "base": "game:block/wood-generic" }
+  },
+  "lightAbsorption": 0,
+  "sidesolidbytype": {
+    "*-up": {
+      "up": false,
+      "down": false,
+      "north": true,
+      "east": true,
+      "south": true,
+      "west": true
+    },
+    "*-down": {
+      "up": false,
+      "down": false,
+      "north": true,
+      "east": true,
+      "south": true,
+      "west": true
+    },
+    "*-north": {
+      "up": true,
+      "down": true,
+      "north": false,
+      "east": true,
+      "south": false,
+      "west": true
+    },
+    "*-east": {
+      "up": true,
+      "down": true,
+      "north": true,
+      "east": false,
+      "south": true,
+      "west": false
+    },
+    "*-south": {
+      "up": true,
+      "down": true,
+      "north": false,
+      "east": true,
+      "south": false,
+      "west": true
+    },
+    "*-west": {
+      "up": true,
+      "down": true,
+      "north": true,
+      "east": false,
+      "south": true,
+      "west": false
+    }
+  },
+  "sideopaque": { "all": false },
+  "replaceable": 300,
+  "resistance": 20,
+  "materialDensity": 300,
+  "drops": [
+    {
+      "type": "block",
+      "code": "hiveaccessport-north",
+      "quantity": {
+        "avg": 1,
+        "var": 0
+      }
+    }
+  ]
+}
