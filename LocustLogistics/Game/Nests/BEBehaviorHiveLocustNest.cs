@@ -31,7 +31,7 @@ namespace LocustHives.Game.Nest
         //public int MaxCapacity => 5;
         //public bool HasRoom => storedLocustData.Count < MaxCapacity;
 
-        public Vec3d Position => Pos.ToVec3d().Add(-0.5f, -0.5f, -0.5f);
+        public Vec3d Position => Pos.ToVec3d().Add(0.5f, 0.5f, 0.5f);
 
         public int Dimension => Blockentity.Pos.dimension;
 

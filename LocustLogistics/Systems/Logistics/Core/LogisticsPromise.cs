@@ -72,7 +72,7 @@ namespace LocustHives.Systems.Logistics.Core
         /// <summary>
         /// Event that is fired whenever a worker fulfills any amount of a promise.
         /// </summary>
-        public event Action<int, ILogisticsWorker> FulfillmentEvent;
+        public event Action<uint, ILogisticsWorker> FulfillmentEvent;
 
         /// <summary>
         /// The stack to be given/taken.
@@ -85,7 +85,7 @@ namespace LocustHives.Systems.Logistics.Core
         public LogisticsPromiseState State => state;
         public LogisticsOperation Operation { get; }
 
-        public uint Fulfilled { get; }
+        public uint Fulfilled => fulfilled;
 
         public LogisticsPromise(ItemStack stack, ILogisticsStorage target, LogisticsOperation operation)
         {
@@ -106,11 +106,14 @@ namespace LocustHives.Systems.Logistics.Core
             if (state == LogisticsPromiseState.Unfulfilled)
             {
                 fulfilled += count;
-                if(fulfilled >= Stack.StackSize)
-                {
-                    state = LogisticsPromiseState.Fulfilled;
-                    CompletedEvent?.Invoke(LogisticsPromiseState.Fulfilled);
-                }
+
+                // We have to set the state before triggering the fulfillment event because if this fulfillment
+                // completely fulfills another promise whose completion would cause this promise to be cancelled,
+                // this promise needs to know whether this is actually cancelled or completed. (See AddChild)
+                if (fulfilled >= Stack.StackSize) state = LogisticsPromiseState.Fulfilled;
+
+                FulfillmentEvent?.Invoke(count, byWorker);
+                if (fulfilled >= Stack.StackSize) CompletedEvent?.Invoke(LogisticsPromiseState.Fulfilled);
             }
         }
 
@@ -141,17 +144,17 @@ namespace LocustHives.Systems.Logistics.Core
         public void AddChild(LogisticsPromise child)
         {
             // If the child receives some fulfillment, propogate the fulfillment to the parent.
-            child.FulfillmentEvent += (count, byWorker) =>
-            {
-                if (state == LogisticsPromiseState.Fulfilled) Fulfill(child.Fulfilled, byWorker);
-            };
+            child.FulfillmentEvent += Fulfill;
 
-            // If the parent promise was cancelled, cancel this one too.
-            CompletedEvent += (state) =>
-            {
-                if (state == LogisticsPromiseState.Cancelled) child.Cancel();
-            };
+            // If the parent promise was completed, cancel the child.
+            var propogateCompletion = (LogisticsPromiseState state) => child.Cancel();
+            CompletedEvent += propogateCompletion;
 
+            // Finally, if the child is cancelled remove it's event handler
+            child.CompletedEvent += (state) =>
+            {
+                CompletedEvent -= propogateCompletion;
+            };
         }
 
     }

@@ -20,6 +20,8 @@ using Vintagestory.API.Util;
 using Vintagestory.Client.NoObf;
 using Vintagestory.Essentials;
 using Vintagestory.GameContent;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using static Vintagestory.Server.Timer;
 
 namespace LocustHives.Game.Logistics.Locust
 {
@@ -29,6 +31,11 @@ namespace LocustHives.Game.Logistics.Locust
         public IStorageAccessMethod method;
         public ItemStack stack;
         public LogisticsOperation operation;
+
+        /// <summary>
+        /// The promise that the completion of this task will completely fulfill.
+        /// If this task fails to fulfill it completely, it will be cancelled.
+        /// </summary>
         public LogisticsPromise promise;
 
         public uint TryDo(ILogisticsWorker worker, IWorldAccessor accessorForResolve)
@@ -72,7 +79,10 @@ namespace LocustHives.Game.Logistics.Locust
                 }
             }
             var total =  (uint)stack.StackSize - toTransfer;
-            if (promise != null) promise.Fulfill(total, worker);
+            if (promise != null)
+            {
+                promise.Fulfill(total, worker);
+            }
             return total;
         }
     }
@@ -87,20 +97,33 @@ namespace LocustHives.Game.Logistics.Locust
         InventoryGeneric inventory;
 
         /// <summary>
-        /// For now, this worker can only promise one thing at a time.
+        /// The queue of storage access methods that this worker should try to perform to fulfill it's current logistics promise.
         /// </summary>
-        LogisticsPromise currentPromise;
+        Queue<AccessTask> queuedStorageAccess;
 
-        /// <summary>
-        /// The queue of storage access methods that this worker should try to perform to fulfill it's current logistics promise
-        /// </summary>
-        Queue<AccessTask> queuedStorageAccess = new Queue<AccessTask>();
+        AccessTask? lastRememberedTask;
+        private const int MsToForgetLastTask = 60000;
+
+        long putAwayListenerId;
+        long forgetLastTaskListenerId;
+
+        float moveSpeed = 0.03f;
 
         public IInventory Inventory => inventory;
 
-        public Queue<AccessTask> AccessTasks { get => queuedStorageAccess; }
-
-        float moveSpeed = 0.03f;
+        public AccessTask? CurrentAccessTask
+        {
+            get {
+                if (queuedStorageAccess.Any())
+                {
+                    return queuedStorageAccess.Peek();
+                }
+                else
+                {
+                    return null;
+                }
+            }
+        }
 
         public EntityBehaviorLocustLogisticsWorker(Entity entity) : base(entity)
         {
@@ -129,6 +152,8 @@ namespace LocustHives.Game.Logistics.Locust
 
             if (entity.Api is ICoreServerAPI)
             {
+                queuedStorageAccess = new Queue<AccessTask>();
+
                 logisticsSystem = entity.Api.ModLoader.GetModSystem<LogisticsSystem>();
                 pathfindSystem = entity.Api.ModLoader.GetModSystem<PathfindSystem>();
 
@@ -136,8 +161,100 @@ namespace LocustHives.Game.Logistics.Locust
                 {
                     logisticsSystem.UpdateLogisticsWorkerMembership(this, hive);
                 };
+
+                putAwayListenerId = entity.Api.Event.RegisterGameTickListener(TryToPutAwaySomeInventory, 3000);
             }
         }
+
+        /// <summary>
+        /// Called to indicate that this current task was done.
+        /// </summary>
+        public void DidCurrentTask()
+        {
+            if (queuedStorageAccess.Any())
+            {
+                // Remember the completed task and set a callback to forget later.
+                lastRememberedTask = queuedStorageAccess.Dequeue();
+                forgetLastTaskListenerId = entity.Api.Event.RegisterCallback(ForgetLastTask, MsToForgetLastTask);
+
+                var promise = lastRememberedTask.Value.promise;
+                if (promise != null)
+                {
+                    // If we were unable to fulfill the promise, cancel it.
+                    if (promise.State == LogisticsPromiseState.Unfulfilled) promise.Cancel();
+                }
+            }
+        }
+
+        private void ForgetLastTask(float dt)
+        {
+            lastRememberedTask = null;
+        }
+
+        private void TryToPutAwaySomeInventory(float dt)
+        {
+            // If no current task, there is something in the inventory, and a member of a hive
+            if (!queuedStorageAccess.Any() && !inventory.Empty && logisticsSystem.WorkerMembership.GetMembershipOf(this, out var hiveId))
+            {
+                // Try puting the a slot's contents away.
+                // Note that until this task is done, this will block making any more promises.
+                // TODO: Don't block
+
+                var giveStack = inventory.Where(slot => !slot.Empty).Select(slot => slot.Itemstack).First();
+
+                // Find where to put it
+                // but skip the last remembered task's storage if it was a take.
+                // We don't want to give the item right back if we just took it.
+                var skipStorage = lastRememberedTask.HasValue && lastRememberedTask.Value.operation == LogisticsOperation.Take ? lastRememberedTask.Value.storage : null;
+
+                // The give strategy in this instance is to give as soon as possible, event if there isn't enough room.
+                // This may not be best? But this behavior isn't exactly time critical, so no need to do exhaustive computations. (unlike computing efforts)
+                IStorageAccessMethod bestMethod = null;
+                ILogisticsStorage bestStorage = null;
+                uint bestCount = uint.MinValue;
+                float bestTime = float.MaxValue;
+                foreach (var storage in logisticsSystem.StorageMembership.GetMembersOf(hiveId))
+                {
+                    if (skipStorage == storage) continue;
+
+                    foreach (var method in storage.AccessMethods)
+                    {
+                        if (!(method is IInWorldStorageAccessMethod iwmethod)) continue;
+
+                        // Make sure we can give with this method.
+                        uint canAccept = method.CanDo(giveStack, LogisticsOperation.Give);
+
+                        // Skip methods that don't have room
+                        if (canAccept == 0) continue;
+
+                        var givePath = ComputePath(entity.Pos.AsBlockPos, iwmethod.Position.AsBlockPos);
+                        if (givePath == null) continue;
+
+                        var giveTime = ComputeTravelTime(givePath);
+                        if (giveTime < bestTime)
+                        {
+                            bestMethod = method;
+                            bestStorage = storage;
+                            bestCount = canAccept;
+                            bestTime = giveTime;
+                        }
+                    }
+                }
+                if (bestStorage != null)
+                {
+                    giveStack.StackSize = Math.Min((int)bestCount, giveStack.StackSize); // Don't give more than we have.
+                    queuedStorageAccess.Enqueue(new AccessTask
+                    {
+                        storage = bestStorage,
+                        method = bestMethod,
+                        operation = LogisticsOperation.Give,
+                        stack = giveStack,
+                        promise = null
+                    });
+                }
+            }
+        }
+        
         public override void OnReceivedServerPacket(int packetid, byte[] data, ref EnumHandling handled)
         {
             if (packetid == 1235)
@@ -200,7 +317,7 @@ namespace LocustHives.Game.Logistics.Locust
         {
             return new WorkerEffort(bestCount, time, (requestedCount) =>
             {
-                if (currentPromise != null) return null;
+                if (queuedStorageAccess.Any()) return null;
 
                 // First, try to get the necessary reservations for all tasks
                 var reservations = new LogisticsReservation[accessTasks.Length];
@@ -228,8 +345,11 @@ namespace LocustHives.Game.Logistics.Locust
                 var promise = new LogisticsPromise(stackForPromise.CloneWithSize((int)Math.Min(requestedCount, bestCount)), promiseTarget, promiseOperation);
                 promise.CompletedEvent += (state) =>
                 {
-                    currentPromise = null;
-                    queuedStorageAccess.Clear();
+                    // Release all the reservations
+                    for (int i = 0; i < reservations.Length; i++)
+                    {
+                        reservations[i]?.Release();
+                    }
                 };
 
                 // If any of the reservations cancel, cancel the promise
@@ -241,8 +361,7 @@ namespace LocustHives.Game.Logistics.Locust
                     };
                 }
 
-                // Now set the promise and queue up the tasks
-                currentPromise = promise;
+                // Now queue up the tasks
                 for (int i = 0; i < accessTasks.Length; i++)
                 {
                     var at = accessTasks[i];
@@ -312,6 +431,7 @@ namespace LocustHives.Game.Logistics.Locust
 
                 // If we still need more items, we have one strategy for now: search storages of the hive this worker is in for stuff to take first.
                 // For now we'll just compute a single stop at another storage.
+                // This is not an enumerable because we will have to iterate over it for each target access method.
                 List<(ILogisticsStorage storage, IStorageAccessMethod method, uint canProvide)> potentialTakeOps = null;
                 if(missingCount != 0)
                 {
@@ -339,7 +459,6 @@ namespace LocustHives.Game.Logistics.Locust
                 foreach (var method in target.AccessMethods)
                 {
                     if (!(method is IInWorldStorageAccessMethod iwmethod)) continue;
-                    var givePos = iwmethod.Position.AsBlockPos;
 
                     // Make sure we can give with this method.
                     // a. we might not be able to give with this particular method
@@ -348,6 +467,8 @@ namespace LocustHives.Game.Logistics.Locust
 
                     // Skip methods that don't have roome
                     if (canAccept == 0) continue;
+
+                    var givePos = iwmethod.Position.AsBlockPos;
 
                     // If we need to take first, 
                     if (potentialTakeOps != null)
@@ -413,6 +534,12 @@ namespace LocustHives.Game.Logistics.Locust
             }
         }
 
+        public override void OnEntityDespawn(EntityDespawnData despawn)
+        {
+            base.OnEntityDespawn(despawn);
+            Cleanup();
+        }
+
         public override void OnEntityDeath(DamageSource damageSourceForDeath)
         {
             if (entity.World.Side == EnumAppSide.Server)
@@ -420,6 +547,7 @@ namespace LocustHives.Game.Logistics.Locust
                 inventory.DropAll(entity.ServerPos.XYZ);
             }
             base.OnEntityDeath(damageSourceForDeath);
+            Cleanup();
         }
 
         public override void GetInfoText(StringBuilder infotext)
@@ -431,6 +559,12 @@ namespace LocustHives.Game.Logistics.Locust
                     .Where(s => !s.Empty)
                     .Select(s => $"{s.Itemstack.StackSize}x {s.Itemstack.GetName()}"))}");
             }
+        }
+
+        public void Cleanup()
+        {
+            entity.Api.Event.UnregisterGameTickListener(putAwayListenerId);
+            entity.Api.Event.UnregisterCallback(forgetLastTaskListenerId);
         }
     }
 }

@@ -1,16 +1,17 @@
-﻿using System;
+﻿using LocustHives.Game.Util;
+using LocustHives.Systems.Logistics;
+using LocustHives.Systems.Logistics.Core;
+using LocustHives.Systems.Logistics.Core.Interfaces;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ConstrainedExecution;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.Client.NoObf;
 using Vintagestory.Essentials;
 using Vintagestory.GameContent;
-using LocustHives.Game.Util;
-using LocustHives.Systems.Logistics.Core;
-using LocustHives.Systems.Logistics.Core.Interfaces;
-using LocustHives.Systems.Logistics;
 
 namespace LocustHives.Game.Logistics.Locust
 {
@@ -19,7 +20,7 @@ namespace LocustHives.Game.Logistics.Locust
     {
 
         EntityBehaviorLocustLogisticsWorker worker;
-        AccessTask curTask;
+        AccessTask? curTask;
         bool seekingAccess;
 
         float moveSpeed = 0.03f;
@@ -45,14 +46,15 @@ namespace LocustHives.Game.Logistics.Locust
 
         public override bool ShouldExecute()
         {
-            return worker.AccessTasks.TryPeek(out curTask);
+            curTask = worker.CurrentAccessTask;
+            return curTask.HasValue;
         }
 
         public override void StartExecute()
         {
             base.StartExecute();
 
-            if (curTask.method is IInWorldStorageAccessMethod method)
+            if (curTask.HasValue && curTask.Value.method is IInWorldStorageAccessMethod method)
             {
                 seekingAccess = pathTraverser.NavigateTo_Async(
                     method.Position,
@@ -70,6 +72,13 @@ namespace LocustHives.Game.Logistics.Locust
         {
             if (!base.ContinueExecute(dt)) return false;
 
+            // If the cur task has changed, stop.
+            if (!curTask.Equals(worker.CurrentAccessTask))
+            {
+                pathTraverser.Stop();
+                seekingAccess = false;
+            }
+
             // Finish if no longer seeking.
             return seekingAccess;
         }
@@ -84,8 +93,11 @@ namespace LocustHives.Game.Logistics.Locust
         private void OnGoalReached()
         {
             seekingAccess = false;
-            curTask.TryDo(worker, entity.Api.World);
-            worker.AccessTasks.Dequeue();
+            if (curTask.HasValue)
+            {
+                curTask.Value.TryDo(worker, entity.Api.World);
+                worker.DidCurrentTask();
+            }
         }
 
         private void OnStuck()

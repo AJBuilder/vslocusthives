@@ -89,7 +89,7 @@ namespace LocustHives.Game.Nest
             pathTraverser.NavigateTo_Async(
                 targetNest.Position,
                 moveSpeed,
-                1.0f,
+                3.0f, // TODO: Will need changed when storing is reimplemented
                 OnGoalReached,
                 OnStuck
             );

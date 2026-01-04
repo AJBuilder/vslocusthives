@@ -64,6 +64,7 @@ namespace LocustHives.Systems.Logistics.Core
             if(promise.State != LogisticsPromiseState.Unfulfilled)
             {
                 countCommissioned.Remove(promise);
+                return;
             }
 
             var countLeft = (uint)promise.Stack.StackSize - countCommissioned.GetValueOrDefault(promise);
@@ -107,9 +108,9 @@ namespace LocustHives.Systems.Logistics.Core
                         // If the worker cancels on us, re-queue.
                         if (state == LogisticsPromiseState.Cancelled)
                         {
-                            // Remove this count as being commissioned
-                            countCommissioned[promise] = countCommissioned.GetValueOrDefault(promise) + countPromised;
-                            // Requeue if needed
+                            // Mark unfulfilled count as needing recommisioned.
+                            countCommissioned[promise] -= (countPromised - bestPromise.Fulfilled);
+                            // Requeue main promise if needed
                             if (!queuedPromises.Contains(promise)) queuedPromises.Enqueue(promise);
                         }
                     };

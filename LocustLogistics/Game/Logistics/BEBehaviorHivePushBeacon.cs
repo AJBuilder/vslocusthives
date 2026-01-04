@@ -124,6 +124,7 @@ namespace LocustHives.Game.Logistics
             request.CompletedEvent += (state) =>
             {
                 requests.Remove(request);
+                Blockentity.MarkDirty();
             };
 
             requests.Add(request);
