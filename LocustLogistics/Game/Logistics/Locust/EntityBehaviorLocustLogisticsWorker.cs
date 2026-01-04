@@ -124,7 +124,7 @@ namespace LocustHives.Game.Logistics.Locust
         {
             base.Initialize(properties, attributes);
 
-            ITreeAttribute tree = entity.WatchedAttributes["mouthInv"] as ITreeAttribute;
+            ITreeAttribute tree = entity.WatchedAttributes["logisticsInventory"] as ITreeAttribute;
             if (tree != null) inventory.FromTreeAttributes(tree);
 
             if (entity.Api is ICoreServerAPI)
@@ -274,14 +274,15 @@ namespace LocustHives.Game.Logistics.Locust
 
                 foreach(var method in target.AccessMethods)
                 {
+                    if(!(method is IInWorldStorageAccessMethod iwmethod)) continue;
+
                     uint canProvide = method.CanDo(stack, operation);
 
                     // Skip methods that don't have the item
                     if (canProvide == 0) continue;
 
-                    var targetPos = Systems.Logistics.Util.GetTargetPosForMethod(method);
-                    if(targetPos == null) continue;
-                    float time = ComputeTravelTime(ComputePath(entity.Pos.AsBlockPos, targetPos));
+                    var path = ComputePath(entity.Pos.AsBlockPos, iwmethod.Position.AsBlockPos);
+                    if(path == null) continue;
 
                     var toTransfer = Math.Min(canAccept, canProvide);
 
@@ -289,7 +290,7 @@ namespace LocustHives.Game.Logistics.Locust
                     // This could be improved to try and drop off items first, etc.
                     yield return CreateEffort(
                         toTransfer,
-                        time,
+                        ComputeTravelTime(path),
                         stack,
                         target,
                         LogisticsOperation.Take,
@@ -337,6 +338,9 @@ namespace LocustHives.Game.Logistics.Locust
                 // Find how to give
                 foreach (var method in target.AccessMethods)
                 {
+                    if (!(method is IInWorldStorageAccessMethod iwmethod)) continue;
+                    var givePos = iwmethod.Position.AsBlockPos;
+
                     // Make sure we can give with this method.
                     // a. we might not be able to give with this particular method
                     // b. there may no longer be room since the promise/request was made.
@@ -345,22 +349,25 @@ namespace LocustHives.Game.Logistics.Locust
                     // Skip methods that don't have roome
                     if (canAccept == 0) continue;
 
-                    var givePos = Systems.Logistics.Util.GetTargetPosForMethod(method);
-                    if (givePos == null) continue;
-
                     // If we need to take first, 
                     if (potentialTakeOps != null)
                     {
                         // yield efforts that have a task to take first from another storage
                         foreach (var (takeStorage, takeMethod, toTake) in potentialTakeOps)
                         {
-                            var takePos = Systems.Logistics.Util.GetTargetPosForMethod(takeMethod);
-                            if (takePos == null) continue;
+                            if (!(takeMethod is IInWorldStorageAccessMethod iwTakeMethod)) continue;
+                            var takePos = iwTakeMethod.Position.AsBlockPos;
+
+                            var takePath = ComputePath(entity.Pos.AsBlockPos, takePos);
+                            if (takePath == null) continue;
+
+                            var transferPath = ComputePath(takePos, givePos);
+                            if (transferPath == null) continue;
 
                             var toGive = Math.Min(canAccept, workerCanProvide + toTake);
                             yield return CreateEffort(
                                 toGive,
-                                ComputeTravelTime(ComputePath(entity.Pos.AsBlockPos, takePos)) + ComputeTravelTime(ComputePath(takePos, givePos)),
+                                ComputeTravelTime(takePath) + ComputeTravelTime(transferPath),
                                 stack,
                                 target,
                                 LogisticsOperation.Take,
@@ -383,9 +390,13 @@ namespace LocustHives.Game.Logistics.Locust
                     {
                         // otherwise just give what this worker currently has
                         var toGive = Math.Min(canAccept, workerCanProvide);
+
+                        var givePath = ComputePath(entity.Pos.AsBlockPos, givePos);
+                        if (givePath == null) continue;
+
                         yield return CreateEffort(
                             toGive,
-                            ComputeTravelTime(ComputePath(entity.Pos.AsBlockPos, givePos)),
+                            ComputeTravelTime(givePath),
                             stack,
                             target,
                             LogisticsOperation.Take,
@@ -401,6 +412,16 @@ namespace LocustHives.Game.Logistics.Locust
                 }
             }
         }
-        
+
+        public override void GetInfoText(StringBuilder infotext)
+        {
+            base.GetInfoText(infotext);
+            if (!inventory.Empty)
+            {
+                infotext.AppendLine($"Carrying: {string.Join(", ", inventory
+                    .Where(s => !s.Empty)
+                    .Select(s => $"{s.Itemstack.StackSize}x {s.Itemstack.GetName()}"))}");
+            }
+        }
     }
 }

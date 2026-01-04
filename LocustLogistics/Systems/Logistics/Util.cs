@@ -25,7 +25,8 @@ namespace LocustHives.Systems.Logistics
             {
                 var s = slot.Itemstack;
                 if (s == null) return stack.Collectible.MaxStackSize;
-                else return s.Equals(stack) ? Math.Max(0, stack.Collectible.MaxStackSize - s.StackSize) : 0;
+                // TODO: Should this be stack.Satisfies(s)?
+                else return s.Satisfies(stack) ? Math.Max(0, stack.Collectible.MaxStackSize - s.StackSize) : 0;
             });
         }
 
@@ -51,22 +52,6 @@ namespace LocustHives.Systems.Logistics
             var clone = stack.GetEmptyClone();
             clone.StackSize = size;
             return clone;
-        }
-
-        /// <summary>
-        /// Given a storage access method, return what block position this worker should go to in order to access.
-        /// 
-        /// (This can be patched to support new methods.)
-        /// </summary>
-        /// <param name="method"></param>
-        /// <returns></returns>
-        public static BlockPos GetTargetPosForMethod(IStorageAccessMethod method)
-        {
-            return method switch
-            {
-                BlockFaceAccessible bfa => bfa.BlockPosition.AddCopy(bfa.Face),
-                _ => null
-            };
         }
     }
 }

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
 
 namespace LocustHives.Systems.Logistics.Core.Interfaces
 {
@@ -16,5 +17,11 @@ namespace LocustHives.Systems.Logistics.Core.Interfaces
         int Priority { get; }
 
         uint CanDo(ItemStack stack, LogisticsOperation operation);
+
+    }
+
+    public interface IInWorldStorageAccessMethod : IStorageAccessMethod
+    {
+        Vec3d Position { get; }
     }
 }

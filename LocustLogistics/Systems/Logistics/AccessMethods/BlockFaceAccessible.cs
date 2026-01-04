@@ -11,13 +11,32 @@ using Vintagestory.API.MathTools;
 namespace LocustHives.Systems.Logistics.AccessMethods
 {
 
-    public readonly struct BlockFaceAccessible : IStorageAccessMethod
+    public readonly struct BlockFaceAccessible : IInWorldStorageAccessMethod
     {
         readonly System.Func<ItemStack, LogisticsOperation, uint> onCanDo;
         public BlockPos BlockPosition { get; }
         public BlockFacing Face { get; }
 
         public int Priority { get; }
+
+        /// <summary>
+        /// Returns the center of the face.
+        /// </summary>
+        public Vec3d Position
+        {
+            get
+            {
+                return Face.Index switch
+                {
+                    BlockFacing.indexUP => BlockPosition.ToVec3d().AddCopy(-0.5f, 0, -0.5f),
+                    BlockFacing.indexDOWN => BlockPosition.ToVec3d().AddCopy(-0.5f, -1f, -0.5f),
+                    BlockFacing.indexNORTH => BlockPosition.ToVec3d().AddCopy(-0.5f, -0.5f, -1f),
+                    BlockFacing.indexSOUTH => BlockPosition.ToVec3d().AddCopy(-0.5f, -0.5f, 0),
+                    BlockFacing.indexEAST => BlockPosition.ToVec3d().AddCopy(0f, -0.5f, -0.5f),
+                    BlockFacing.indexWEST => BlockPosition.ToVec3d().AddCopy(-1f, -0.5f, -0.5f),
+                };
+            }
+        }
 
         public BlockFaceAccessible(BlockPos pos, BlockFacing face, int priority, System.Func<ItemStack, LogisticsOperation, uint> onCanDo)
         {

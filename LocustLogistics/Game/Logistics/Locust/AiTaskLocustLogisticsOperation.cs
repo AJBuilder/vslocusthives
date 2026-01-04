@@ -20,7 +20,7 @@ namespace LocustHives.Game.Logistics.Locust
 
         EntityBehaviorLocustLogisticsWorker worker;
         AccessTask curTask;
-        bool pathfindingActive;
+        bool seekingAccess;
 
         float moveSpeed = 0.03f;
 
@@ -38,7 +38,7 @@ namespace LocustHives.Game.Logistics.Locust
             worker = entity.GetAs<EntityBehaviorLocustLogisticsWorker>();
             worker.TasksCancelled += () =>
             {
-                pathfindingActive = false;
+                seekingAccess = false;
                 pathTraverser.Stop();
             };
         }
@@ -52,14 +52,17 @@ namespace LocustHives.Game.Logistics.Locust
         {
             base.StartExecute();
 
-            pathfindingActive = pathTraverser.NavigateTo_Async(
-                Systems.Logistics.Util.GetTargetPosForMethod(curTask.method).ToVec3d(),
-                moveSpeed,
-                0.5f,
-                OnGoalReached,
-                OnStuck,
-                OnNoPath
-            );
+            if (curTask.method is IInWorldStorageAccessMethod method)
+            {
+                seekingAccess = pathTraverser.NavigateTo_Async(
+                    method.Position,
+                    moveSpeed,
+                    0.5f,
+                    OnGoalReached,
+                    OnStuck,
+                    OnNoPath
+                );
+            }
         }
 
 
@@ -67,31 +70,32 @@ namespace LocustHives.Game.Logistics.Locust
         {
             if (!base.ContinueExecute(dt)) return false;
 
-            // Finish if no longer pathfinding.
-            return pathfindingActive;
+            // Finish if no longer seeking.
+            return seekingAccess;
         }
 
         public override void FinishExecute(bool cancelled)
         {
+            base.FinishExecute(cancelled);
             pathTraverser.Stop();
-            pathfindingActive = false;
+            seekingAccess = false;
         }
 
         private void OnGoalReached()
         {
-            pathfindingActive = false;
+            seekingAccess = false;
             curTask.TryDo(worker, entity.Api.World);
             worker.AccessTasks.Dequeue();
         }
 
         private void OnStuck()
         {
-            pathfindingActive = false;
+            seekingAccess = false;
         }
 
         private void OnNoPath()
         {
-            pathfindingActive = false;
+            seekingAccess = false;
         }
 
     }
