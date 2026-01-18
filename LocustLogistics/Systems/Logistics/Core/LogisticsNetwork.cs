@@ -34,7 +34,7 @@ namespace LocustHives.Systems.Logistics.Core
             Storages = storage;
         }
 
-        public LogisticsPromise Push(ItemStack stack, ILogisticsStorage from)
+        public LogisticsPromise Push(ItemStack stack, ILogisticsStorage from, bool blocking = true)
         {
             if (stack.StackSize == 0) return null;
             stack = stack.Clone();
@@ -42,7 +42,7 @@ namespace LocustHives.Systems.Logistics.Core
             return Request(stack, from);
         }
 
-        public LogisticsPromise Pull(ItemStack stack, ILogisticsStorage into)
+        public LogisticsPromise Pull(ItemStack stack, ILogisticsStorage into, bool blocking = true)
         {
             if (stack.StackSize == 0) return null;
             stack = stack.Clone();
@@ -50,10 +50,11 @@ namespace LocustHives.Systems.Logistics.Core
             return Request(stack, into);
         }
 
-        public LogisticsPromise Request(ItemStack stack, ILogisticsStorage target)
+        public LogisticsPromise Request(ItemStack stack, ILogisticsStorage target, bool blocking = true)
         {
             var promise = new LogisticsPromise(stack, target);
             queuedPromises.Enqueue(promise);
+            if(blocking) CommisionWorkersForNextQueuedPromise();
             return promise;
         }
 

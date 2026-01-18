@@ -13,6 +13,6 @@ namespace LocustHives.Systems.Logistics.Core.Interfaces
     {
         IReadOnlySet<ILogisticsWorker> Workers { get; }
         IReadOnlySet<ILogisticsStorage> Storages { get; }
-        LogisticsPromise Request(ItemStack stack, ILogisticsStorage target);
+        LogisticsPromise Request(ItemStack stack, ILogisticsStorage target, bool blocking = true);
     }
 }
