@@ -12,6 +12,7 @@ using Vintagestory.GameContent;
 using LocustHives.Systems.Nests;
 using LocustHives.Game.Core;
 using LocustHives.Game.Nests;
+using Vintagestory.API.Server;
 
 namespace LocustHives.Game.Nest
 {
@@ -46,10 +47,13 @@ namespace LocustHives.Game.Nest
         {
             base.Initialize(api, properties);
             var modSystem = api.ModLoader.GetModSystem<NestsSystem>();
-            Blockentity.GetBehavior<BEBehaviorLocustHiveTunable>().OnTuned += (prevHive, hive) =>
+            if(api is ICoreServerAPI)
             {
-                modSystem.UpdateNestMembership(this, hive);
-            };
+                Blockentity.GetBehavior<BEBehaviorLocustHiveTunable>().OnTuned += (prevHive, hive) =>
+                {
+                    modSystem.UpdateNestMembership(this, hive);
+                };
+            }
         }
 
         public override void OnBlockRemoved()

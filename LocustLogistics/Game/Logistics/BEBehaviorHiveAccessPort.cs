@@ -18,11 +18,16 @@ namespace LocustHives.Game.Logistics
 
 
 
-    public class BEBehaviorHiveAccessPort : BlockEntityBehavior, ILogisticsStorage
+    public class BEBehaviorHiveAccessPort : BlockEntityBehavior, ILogisticsStorage, IBlockHiveStorage
     {
         // Faces towards the inventory. Access opening is opposite of facing.
         BlockFacing facing;
         HashSet<LogisticsReservation> reservations;
+
+        /// <summary>
+        /// For single-block storage like access ports, this simply returns itself.
+        /// </summary>
+        public ILogisticsStorage LogisticsStorage => this;
 
         public IInventory Inventory
         {
@@ -69,18 +74,18 @@ namespace LocustHives.Game.Logistics
             var facingCode = properties["facingCode"].AsString();
             facing = BlockFacing.FromCode(Blockentity.Block.Variant[facingCode]);
 
-            var tunableBehavior = Blockentity.GetBehavior<IHiveMember>();
-            if (tunableBehavior != null)
-            {
-                tunableBehavior.OnTuned += (prevHive, hive) =>
-                {
-                    api.ModLoader.GetModSystem<LogisticsSystem>().UpdateLogisticsStorageMembership(this, hive);
-                };
-            }
-
             if (api is ICoreServerAPI)
             {
                 reservations = new HashSet<LogisticsReservation>();
+
+                var tunableBehavior = Blockentity.GetBehavior<IHiveMember>();
+                if (tunableBehavior != null)
+                {
+                    tunableBehavior.OnTuned += (prevHive, hive) =>
+                    {
+                        api.ModLoader.GetModSystem<LogisticsSystem>().UpdateLogisticsStorageMembership(this, hive);
+                    };
+                }
             }
         }
 
@@ -89,7 +94,7 @@ namespace LocustHives.Game.Logistics
             var available = CanDo(stack);
             if (available >= (uint)Math.Abs(stack.StackSize))
             {
-                var reservation = new LogisticsReservation(stack, this);
+                var reservation = new LogisticsReservation(stack);
                 reservations.Add(reservation);
                 reservation.ReleasedEvent += () =>
                 {

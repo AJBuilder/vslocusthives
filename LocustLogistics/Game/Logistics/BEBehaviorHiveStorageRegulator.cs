@@ -40,7 +40,7 @@ namespace LocustHives.Game.Logistics
                 if (facing == null) return null;
                 BlockPos targetPos = Pos.AddCopy(facing.Opposite);
                 var be = Api.World.BlockAccessor.GetBlockEntity(targetPos);
-                return be?.GetAs<ILogisticsStorage>();
+                return be?.GetAs<IBlockHiveStorage>()?.LogisticsStorage;
             }
         }
 
@@ -116,7 +116,7 @@ namespace LocustHives.Game.Logistics
         {
             if(Api is ICoreServerAPI)
             {
-                while(promises.First() != null) promises.First().Cancel();
+                while(promises.Count > 0) promises.First().Cancel();
             }
         }
 

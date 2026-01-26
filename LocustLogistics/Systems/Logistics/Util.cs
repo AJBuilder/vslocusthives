@@ -113,8 +113,6 @@ namespace LocustHives.Systems.Logistics
 
                 transferred += (uint)moved;
                 remaining -= (uint)moved;
-                sourceSlot.MarkDirty();
-                bestSlot.slot.MarkDirty();
             }
 
             return transferred;
