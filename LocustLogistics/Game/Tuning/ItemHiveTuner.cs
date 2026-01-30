@@ -19,13 +19,13 @@ namespace LocustHives.Game.Core
     }
     public class ItemHiveTuner : Item
     {
-        TuningSystem modSystem;
+        TuningSystem tuningSystem;
         SkillItem[] toolModes;
 
         public override void OnLoaded(ICoreAPI api)
         {
             base.OnLoaded(api);
-            modSystem = api.ModLoader.GetModSystem<TuningSystem>();
+            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
             ICoreClientAPI capi = api as ICoreClientAPI;
 
 
@@ -109,7 +109,7 @@ namespace LocustHives.Game.Core
                     case HiveTunerMode.Calibrate:
                         {
                             // Look up in registry
-                            if (modSystem.GetMembershipOf(handle, out var hiveId))
+                            if (tuningSystem.GetMembershipOf(handle, out var hiveId))
                             {
                                 if (api is ICoreClientAPI capi)
                                 {
@@ -134,7 +134,7 @@ namespace LocustHives.Game.Core
                                 }
                                 else
                                 {
-                                    modSystem.Tune(handle, hiveId.Value);
+                                    tuningSystem.Tune(handle, hiveId.Value);
                                 }
 
                                 // Not sure I like this logic here...
@@ -152,7 +152,7 @@ namespace LocustHives.Game.Core
                     case HiveTunerMode.Zero:
                         {
                             if (api is ICoreClientAPI capi) capi.TriggerIngameDiscovery(this, "Zeroed target", $"Removed Hive tuning.");
-                            else modSystem.Tune(handle, null);
+                            else tuningSystem.Tune(handle, null);
 
                             // Not sure I like this logic here...
                             // But let's just set the guardedPlayer or guardedEntity whenever we zero

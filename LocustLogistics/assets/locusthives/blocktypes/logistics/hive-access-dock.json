@@ -10,7 +10,6 @@
     }
   ],
   "entityBehaviors": [
-    { "name": "HiveTunable" },
     {
       "name": "HiveAccessPort",
       "properties": { "facingCode": "rot" }

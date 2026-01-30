@@ -2,11 +2,7 @@
   "code": "locustnest-cage-tamed",
   "class": "BlockTamedLocustNest",
   "entityBehaviors": [
-    { "name": "HiveLocustNest" },
-    {
-      "name": "HiveTunable",
-      "properties": { "createsHive": true }
-    }
+    { "name": "HiveLocustNest" }
   ],
   "creativeinventory": {
     "general": [ "*" ],

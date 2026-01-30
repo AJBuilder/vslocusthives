@@ -87,7 +87,7 @@ namespace LocustHives.Game.Logistics
                 LogisticsPromise bestPromise = null;
                 Workers
                     // 1. For each worker, get all of it's efforts.
-                    // TODO: Call GetEfforts on the main thread.
+                    // TODO: Run this on another thread and run GetEfforts on the main thread.
                     .SelectMany(worker => worker.GetEfforts(stack, promise.Target))
                     .Where(effort => effort.CountAvailable != 0)
 

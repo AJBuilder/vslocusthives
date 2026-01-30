@@ -81,10 +81,10 @@ namespace LocustHives.Game.Logistics
             var facingCode = properties["facingCode"].AsString();
             facing = BlockFacing.FromCode(Blockentity.Block.Variant[facingCode]);
 
+            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
             if (api is ICoreServerAPI sapi)
             {
                 reservations = new HashSet<LogisticsReservation>();
-                tuningSystem = sapi.ModLoader.GetModSystem<TuningSystem>();
             }
         }
 
@@ -143,7 +143,7 @@ namespace LocustHives.Game.Logistics
                 tuningSystem.Tune(handle, null);
             }
 
-            DisconnectFromLogistics();
+            CleanupLogistics();
         }
 
         public override void OnBlockUnloaded()
@@ -151,10 +151,10 @@ namespace LocustHives.Game.Logistics
             base.OnBlockUnloaded();
             // Don't detune on unload - membership persists!
             // Just cleanup reservations
-            DisconnectFromLogistics();
+            CleanupLogistics();
         }
 
-        public void DisconnectFromLogistics()
+        public void CleanupLogistics()
         {
             reservations?.Foreach(r => r.Release());
         }

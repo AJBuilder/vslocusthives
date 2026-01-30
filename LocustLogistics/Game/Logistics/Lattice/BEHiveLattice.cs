@@ -79,10 +79,10 @@ namespace LocustHives.Game.Logistics.Lattice
 
             base.Initialize(api);
 
+            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
             if (api is ICoreServerAPI sapi)
             {
                 logisticsSystem = sapi.ModLoader.GetModSystem<LogisticsSystem>();
-                tuningSystem = sapi.ModLoader.GetModSystem<TuningSystem>();
                 reservations = new HashSet<LogisticsReservation>();
             }
         }

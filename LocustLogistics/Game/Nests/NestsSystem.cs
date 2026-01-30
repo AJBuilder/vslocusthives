@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using LocustHives.Game.Core;
+using LocustHives.Game.Locust;
 using LocustHives.Game.Logistics;
 using LocustHives.Game.Nest;
 using LocustHives.Systems.Logistics;

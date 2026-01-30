@@ -44,7 +44,6 @@ namespace LocustHives.Game.Core
         Dictionary<string, System.Func<byte[], IHiveMember>> deserializers = new Dictionary<string, System.Func<byte[], IHiveMember>>();
         Dictionary<Type, (string, System.Func<IHiveMember, byte[]>)> serializers = new Dictionary<Type, (string, System.Func<IHiveMember, byte[]>)>();
 
-
         /// <summary>
         /// Event fired when membership changes.
         /// Parameters: (member, previousHiveId, newHiveId)
@@ -283,6 +282,8 @@ namespace LocustHives.Game.Core
         private void OnWorldLoad()
         {
             var data = sapi.WorldManager.SaveGame.GetData<byte[]>("LocustHivesMembership");
+            if(data == null) return;
+            
             var unknown = new List<(string, int, byte[])>();
 
             using (var ms = new MemoryStream(data))
@@ -317,7 +318,7 @@ namespace LocustHives.Game.Core
                             {
                                 sapi.Logger.Error($"Failed to deserialize membership of type {typeId}: {ex.Message}");
                             }
-                            if (handle != null) Tune(handle, hiveId);
+                            if (handle != null) AssignMembersip(handle, hiveId);
                         }
                         else
                         {

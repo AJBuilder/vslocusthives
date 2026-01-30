@@ -119,7 +119,7 @@ namespace LocustHives.Game.Logistics.Locust
         // IHiveTunable implementation
         public IHiveMember GetHiveMemberHandle()
         {
-            return new LogisticsWorkerHandle(entity.EntityId, entity.Api);
+            return new GenericEntityLogisticsWorker(entity.EntityId, entity.Api);
         }
 
         public EntityBehaviorLocustLogisticsWorker(Entity entity) : base(entity)
@@ -147,13 +147,14 @@ namespace LocustHives.Game.Logistics.Locust
             ITreeAttribute tree = entity.WatchedAttributes["logisticsInventory"] as ITreeAttribute;
             if (tree != null) inventory.FromTreeAttributes(tree);
 
+            tuningSystem = entity.Api.ModLoader.GetModSystem<TuningSystem>();
+
             if (entity.Api is ICoreServerAPI sapi)
             {
                 queuedStorageAccess = new Queue<AccessTask>();
 
                 logisticsSystem = sapi.ModLoader.GetModSystem<LogisticsSystem>();
                 pathfindSystem = sapi.ModLoader.GetModSystem<PathfindSystem>();
-                tuningSystem = sapi.ModLoader.GetModSystem<TuningSystem>();
 
                 putAwayListenerId = sapi.Event.RegisterGameTickListener(TryToPutAwaySomeInventory, 3000);
             }
@@ -188,7 +189,7 @@ namespace LocustHives.Game.Logistics.Locust
         {
             // If no current task, there is something in the inventory, and a member of a hive
             var handle = GetHiveMemberHandle();
-            if (!queuedStorageAccess.Any() && !inventory.Empty && tuningSystem.Membership.GetMembershipOf(handle, out var currentHiveId))
+            if (!queuedStorageAccess.Any() && !inventory.Empty && tuningSystem.GetMembershipOf(handle, out var currentHiveId))
             {
                 // Try puting the a slot's contents away.
                 // Note that until this task is done, this will block making any more promises.
@@ -207,7 +208,7 @@ namespace LocustHives.Game.Logistics.Locust
                 ILogisticsStorage bestStorage = null;
                 uint bestCount = uint.MinValue;
                 float bestTime = float.MaxValue;
-                foreach (var storage in tuningSystem.GetMembersOfHive<ILogisticsStorage>(currentHiveId))
+                foreach (var storage in tuningSystem.GetMembersOf(currentHiveId).OfType<ILogisticsStorage>())
                 {
                     if (skipStorage == storage) continue;
 
@@ -378,7 +379,7 @@ namespace LocustHives.Game.Logistics.Locust
         {
             // Get this worker's hive. Bail if not in a hive.
             var handle = GetHiveMemberHandle();
-            if (!tuningSystem.Membership.GetMembershipOf(handle, out var currentHiveId)) yield break;
+            if (!tuningSystem.GetMembershipOf(handle, out var currentHiveId)) yield break;
 
             bool isTake = stack.StackSize < 0;
             uint absStackSize = (uint)Math.Abs(stack.StackSize);
@@ -444,7 +445,7 @@ namespace LocustHives.Game.Logistics.Locust
                         // Use negative stack for Take query
                         var takeStack = stack.CloneWithSize(-(int)Math.Min(missingCount, canAccept));
                         uint availableToTake;
-                        foreach (var storage in tuningSystem.GetMembersOfHive<ILogisticsStorage>(currentHiveId))
+                        foreach (var storage in tuningSystem.GetMembersOf(currentHiveId).OfType<ILogisticsStorage>())
                         {
                             if (storage == target) continue;
                             foreach (var method in storage.AccessMethods)
@@ -558,6 +559,10 @@ namespace LocustHives.Game.Logistics.Locust
         public override void GetInfoText(StringBuilder infotext)
         {
             base.GetInfoText(infotext);
+            if(tuningSystem.GetMembershipOf(GetHiveMemberHandle(), out var hiveId))
+            {
+                infotext.AppendLine($"Hive: {hiveId}");
+            }
             if (!inventory.Empty)
             {
                 infotext.AppendLine($"Carrying: {string.Join(", ", inventory

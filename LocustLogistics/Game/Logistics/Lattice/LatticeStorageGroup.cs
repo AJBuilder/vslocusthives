@@ -225,7 +225,7 @@ namespace LocustHives.Systems.Logistics
                     if(visited.Contains(pos)) continue;
 
                     var otherLatttice = blockAccessor.GetBlockEntity(pos)?.GetAs<IStorageLattice>();
-                    if(visited.Add(otherLatttice.Pos))
+                    if(otherLatttice != null && visited.Add(otherLatttice.Pos))
                     {
                         queue.Enqueue(otherLatttice);
                     }

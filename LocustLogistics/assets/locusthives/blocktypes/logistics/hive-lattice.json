@@ -1,10 +1,6 @@
 {
   "code": "hivelattice",
   "entityClass": "HiveLattice",
-  "entityBehaviors": [
-    { "name": "HiveTunable" },
-    {"name": "HiveLattice" }
-  ],
   "attributes": {
     "quantitySlots": 30
   },

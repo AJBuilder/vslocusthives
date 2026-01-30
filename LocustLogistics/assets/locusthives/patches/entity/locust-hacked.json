@@ -3,23 +3,6 @@
     "op": "add",
     "path": "/server/behaviors/-",
     "value": {
-      "code": "hivetunable"
-    },
-    "file": "game:entities/lore/locust-hacked.json"
-  },
-  {
-    "op": "add",
-    "path": "/client/behaviors/-",
-    "value": {
-      "code": "hivetunable"
-    },
-    "file": "game:entities/lore/locust-hacked.json"
-  },
-
-  {
-    "op": "add",
-    "path": "/server/behaviors/-",
-    "value": {
       "code": "hivelogisticsworker"
     },
     "file": "game:entities/lore/locust-hacked.json"

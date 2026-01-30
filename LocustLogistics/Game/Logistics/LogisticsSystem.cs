@@ -41,7 +41,7 @@ namespace LocustHives.Game.Logistics
             api.RegisterBlockClass("BlockHiveStorageRegulator", typeof(BlockHiveStorageRegulator));
             api.RegisterBlockEntityClass("HiveLattice", typeof(BEHiveLattice));
             
-            this.tuningSystem = sapi.ModLoader.GetModSystem<TuningSystem>();
+            this.tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
             tuningSystem.RegisterMembershipType("locusthives:storage", GenericBlockEntityLogisticsStorage.ToBytes, (bytes) => GenericBlockEntityLogisticsStorage.FromBytes(bytes, api));
             tuningSystem.RegisterMembershipType("locusthives:lattice", LatticeStorageGroup.ToBytes, (bytes) => LatticeStorageGroup.FromBytes(bytes, api));
             tuningSystem.RegisterMembershipType("locusthives:worker", GenericBlockEntityLogisticsStorage.ToBytes, (bytes) => GenericBlockEntityLogisticsStorage.FromBytes(bytes, api));

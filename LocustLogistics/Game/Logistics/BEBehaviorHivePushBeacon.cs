@@ -49,7 +49,7 @@ namespace LocustHives.Game.Logistics
     public class BEBehaviorHivePushBeacon : BlockEntityBehavior
     {
         BlockFacing facing;
-        LogisticsSystem modSystem;
+        LogisticsSystem logisticsSystem;
         TuningSystem tuningSystem;
         List<LogisticsPromise> requests;
         int clientRequestCount;
@@ -72,7 +72,7 @@ namespace LocustHives.Game.Logistics
                 var storage = AttachedStorage;
                 if (storage is IHiveMember member && tuningSystem.GetMembershipOf(member, out var hiveId))
                 {
-                    return modSystem.GetNetworkFor(hiveId);
+                    return logisticsSystem.GetNetworkFor(hiveId);
                 }
                 else
                 {
@@ -90,6 +90,7 @@ namespace LocustHives.Game.Logistics
         {
             base.Initialize(api, properties);
 
+            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
             if(api is ICoreServerAPI)
             {
                 requests = new List<LogisticsPromise>();
@@ -97,8 +98,7 @@ namespace LocustHives.Game.Logistics
                 var facingCode = properties["facingCode"].AsString();
                 facing = BlockFacing.FromCode(Blockentity.Block.Variant[facingCode]);
 
-                modSystem = api.ModLoader.GetModSystem<LogisticsSystem>();
-                tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
+                logisticsSystem = api.ModLoader.GetModSystem<LogisticsSystem>();
             }
         }
 

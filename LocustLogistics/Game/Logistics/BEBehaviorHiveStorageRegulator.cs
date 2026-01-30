@@ -20,7 +20,7 @@ namespace LocustHives.Game.Logistics
     {
         ItemStack trackedItem;
         BlockFacing facing;
-        LogisticsSystem modSystem;
+        LogisticsSystem logisticsSystem;
         TuningSystem tuningSystem;
         List<LogisticsPromise> promises;
         int clientPromisedAmount;
@@ -57,6 +57,7 @@ namespace LocustHives.Game.Logistics
 
             if (trackedItem != null && !trackedItem.ResolveBlockOrItem(Api.World)) trackedItem = null;
 
+            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
             if (api is ICoreServerAPI serverAPI)
             {
                 promises = new List<LogisticsPromise>();
@@ -64,8 +65,7 @@ namespace LocustHives.Game.Logistics
                 var facingCode = properties["facingCode"].AsString();
                 facing = BlockFacing.FromCode(Blockentity.Block.Variant[facingCode]);
 
-                modSystem = api.ModLoader.GetModSystem<LogisticsSystem>();
-                tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
+                logisticsSystem = api.ModLoader.GetModSystem<LogisticsSystem>();
 
                 Blockentity.RegisterGameTickListener((dt) =>
                 {
@@ -99,7 +99,7 @@ namespace LocustHives.Game.Logistics
 
                 if (storage is IHiveMember member && tuningSystem.GetMembershipOf(member, out var hiveId))
                 {
-                    var promise = modSystem.GetNetworkFor(hiveId)?.Request(stack, AttachedStorage);
+                    var promise = logisticsSystem.GetNetworkFor(hiveId)?.Request(stack, AttachedStorage);
                     if (promise != null)
                     {
                         promise.CompletedEvent += (state) =>
