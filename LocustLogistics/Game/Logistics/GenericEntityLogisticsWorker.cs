@@ -80,16 +80,11 @@ namespace LocustHives.Systems.Logistics
             return api.World.GetEntityById(entityId)?.GetAs<ILogisticsWorker>();
         }
 
-        // Equality based on entityId
-        public bool Equals(IHiveMember other)
-        {
-            return other is GenericEntityLogisticsWorker handle &&
-                   entityId == handle.entityId;
-        }
 
         public override bool Equals(object obj)
         {
-            return obj is GenericEntityLogisticsWorker handle && Equals(handle);
+            return obj is GenericEntityLogisticsWorker handle &&
+                   entityId == handle.entityId;
         }
 
         public override int GetHashCode()

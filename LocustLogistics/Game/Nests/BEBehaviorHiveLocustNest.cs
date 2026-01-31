@@ -154,6 +154,10 @@ namespace LocustHives.Game.Nest
         {
             base.GetBlockInfo(forPlayer, dsc);
             //dsc.AppendLine($"Locusts: {storedLocustData.Count}/{MaxCapacity}");
+            if(coreSystem.GetHiveOf(HiveMembershipHandle, out var hive))
+            {
+                dsc.AppendLine($"Hive: {hive.Name}");
+            }
         }
     }
 }

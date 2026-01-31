@@ -73,21 +73,16 @@ namespace LocustHives.Systems.Logistics
         /// <returns>The amount successfully transferred.</returns>
         public static uint TryTakeMatching(this IInventory inventory, IWorldAccessor world, ItemStack stack, ItemSlot sinkSlot, uint maxQuantity)
         {
-            uint remaining = maxQuantity;
+            if(maxQuantity == 0) return 0;
             uint transferred = 0;
 
             foreach (var slot in inventory)
             {
-                if (remaining <= 0) break;
+                if (transferred >= maxQuantity) break;
 
                 if (slot.Itemstack?.Satisfies(stack) ?? false)
                 {
-                    int moved = slot.TryPutInto(world, sinkSlot, (int)remaining);
-                    if (moved > 0)
-                    {
-                        transferred += (uint)moved;
-                        remaining -= (uint)moved;
-                    }
+                    transferred += (uint)slot.TryPutInto(world, sinkSlot, (int)maxQuantity - (int)transferred);
                 }
             }
 
@@ -100,19 +95,15 @@ namespace LocustHives.Systems.Logistics
         /// <returns>The amount successfully transferred.</returns>
         public static uint TryPutIntoBestSlots(this IInventory inventory, IWorldAccessor world, ItemSlot sourceSlot, uint maxQuantity)
         {
-            uint remaining = maxQuantity;
+            if(maxQuantity == 0) return 0;
             uint transferred = 0;
 
-            while (remaining > 0 && !sourceSlot.Empty)
+            while (maxQuantity > transferred && !sourceSlot.Empty)
             {
                 var bestSlot = inventory.GetBestSuitedSlot(sourceSlot);
                 if (bestSlot.slot == null) break;
 
-                int moved = sourceSlot.TryPutInto(world, bestSlot.slot, (int)remaining);
-                if (moved <= 0) break;
-
-                transferred += (uint)moved;
-                remaining -= (uint)moved;
+                transferred += (uint)sourceSlot.TryPutInto(world, bestSlot.slot, (int)maxQuantity - (int)transferred);
             }
 
             return transferred;

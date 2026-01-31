@@ -38,7 +38,7 @@ namespace LocustHives.Game.Nexus
         {
             api.RegisterBlockEntityBehaviorClass("HiveNexus", typeof(BEBehaviorHiveNexus));
             coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
-            coreSystem.RegisterMembershipType<NexusMembership>("locusthives:nexus", NexusMembership.ToBytes, (bytes) => NexusMembership.FromBytes(bytes, api));
+            coreSystem.RegisterMembershipType<NexusMembership>("locusthives:nexus", NexusMembership.ToBytes, NexusMembership.FromBytes);
         }
 
     }

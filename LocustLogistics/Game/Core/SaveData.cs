@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ProtoBuf;
 
@@ -24,7 +25,7 @@ namespace LocustHives.Game.Core
         public string name;
 
         [ProtoMember(2)]
-        public HiveMemberSaveData[] members;
+        public HiveMemberSaveData[] members = Array.Empty<HiveMemberSaveData>();
     }
 
     [ProtoContract]

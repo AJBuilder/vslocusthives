@@ -86,32 +86,16 @@ namespace LocustHives.Systems.Nests
             return be?.GetBehavior<BEBehaviorHiveLocustNest>();
         }
 
-        // Equality based on position
-        public bool Equals(IHiveMember other)
-        {
-            return other is NestHandle handle &&
-                   position != null && handle.position != null &&
-                   position.Equals(handle.position);
-        }
-
         public override bool Equals(object obj)
         {
-            return obj is NestHandle handle && Equals(handle);
+            return obj is NestHandle handle &&
+                   position != null && handle.position != null &&
+                   position.Equals(handle.position);
         }
 
         public override int GetHashCode()
         {
             return position.GetHashCode();
-        }
-
-        public static bool operator ==(NestHandle left, NestHandle right)
-        {
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(NestHandle left, NestHandle right)
-        {
-            return !left.Equals(right);
         }
     }
 }

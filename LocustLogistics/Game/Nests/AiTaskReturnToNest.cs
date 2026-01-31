@@ -3,6 +3,7 @@ using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using LocustHives.Game.Core;
+using LocustHives.Game.Util;
 
 namespace LocustHives.Game.Locust
 {
@@ -31,15 +32,7 @@ namespace LocustHives.Game.Locust
         public override void AfterInitialize()
         {
             base.AfterInitialize();
-            member = entity as IHiveMember;
-            if (member == null)
-            {
-                member = entity
-                        .SidedProperties
-                        .Behaviors
-                        .OfType<IHiveMember>()
-                        .FirstOrDefault();
-            }
+            member = entity.GetAs<IHiveTunable>().HiveMembershipHandle;
         }
 
         public override bool ShouldExecute()

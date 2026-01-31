@@ -19,6 +19,10 @@ public struct HiveHandle
         this.doTune = doTune;
     }
 
+    /// <summary>
+    /// The persistent unique identifier for this hive.
+    /// This will not change across saves/loads and client/server.
+    /// </summary>
     public uint Id => hiveData.id;
 
     public string Name
@@ -31,8 +35,9 @@ public struct HiveHandle
 
     /// <summary>
     /// Tunes the given member to this hive.
+    /// Doesn't do anything on the client.
     /// </summary>
     /// <param name="member"></param>
     /// <returns></returns>
-    public void Tune(IHiveMember member) => doTune(member, hiveData);
+    public void Tune(IHiveMember member) => doTune?.Invoke(member, hiveData);
 }

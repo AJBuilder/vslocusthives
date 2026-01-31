@@ -1,3 +1,5 @@
+using LocustHives.Game.Logistics.Lattice;
+using LocustHives.Systems.Logistics;
 using LocustHives.Systems.Logistics.Core.Interfaces;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -20,7 +22,7 @@ namespace LocustHives.Game.Logistics
             if (world.Side != EnumAppSide.Server) return true;
 
             var be = world.BlockAccessor.GetBlockEntity(blockSel.Position);
-            var gauge = be?.GetBehavior<BEBehaviorHiveStorageRegulator>();
+            var gauge = be?.GetBehavior<IStorageRegulator>();
             if (gauge == null) return base.OnBlockInteractStart(world, byPlayer, blockSel);
 
             switch (blockSel.SelectionBoxIndex)
@@ -29,24 +31,29 @@ namespace LocustHives.Game.Logistics
                     var heldStack = byPlayer.InventoryManager.ActiveHotbarSlot?.Itemstack;
                     if (heldStack != null)
                     {
-                        gauge.TrackedItem = heldStack;
+                        gauge.TrackedItem = heldStack.CloneWithSize((int)gauge.CurrentLevel);
                     }
                     else
                     {
                         gauge.TrackedItem = null;
                     }
                     return true;
-
                 case INCREMENT_BOX:
-                    gauge.TrackedItem.StackSize++;
-                    be.MarkDirty();
+                    {
+                        var stack = gauge.TrackedItem = gauge.TrackedItem;
+                        stack.StackSize++;
+                        gauge.TrackedItem = stack;
+                    }
                     return true;
 
                 case DECREMENT_BOX:
-                    if (gauge.TrackedItem.StackSize > 0)
                     {
-                        gauge.TrackedItem.StackSize--;
-                        be.MarkDirty();
+                        var stack = gauge.TrackedItem = gauge.TrackedItem;
+                        if (stack.StackSize > 0)
+                        {
+                            stack.StackSize--;
+                        }
+                        gauge.TrackedItem = stack;
                     }
                     return true;
 

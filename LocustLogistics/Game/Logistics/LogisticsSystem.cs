@@ -42,9 +42,9 @@ namespace LocustHives.Game.Logistics
             api.RegisterBlockEntityClass("HiveLattice", typeof(BEHiveLattice));
             
             this.coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
-            coreSystem.RegisterMembershipType("locusthives:storage", GenericBlockEntityLogisticsStorage.ToBytes, (bytes) => GenericBlockEntityLogisticsStorage.FromBytes(bytes, api));
-            coreSystem.RegisterMembershipType("locusthives:lattice", LatticeStorageGroup.ToBytes, (bytes) => LatticeStorageGroup.FromBytes(bytes, api));
-            coreSystem.RegisterMembershipType("locusthives:worker", GenericBlockEntityLogisticsStorage.ToBytes, (bytes) => GenericBlockEntityLogisticsStorage.FromBytes(bytes, api));
+            coreSystem.RegisterMembershipType("locusthives:storage", GenericBlockEntityLogisticsStorage.ToBytes, GenericBlockEntityLogisticsStorage.FromBytes);
+            coreSystem.RegisterMembershipType("locusthives:lattice", LatticeStorageGroup.ToBytes, LatticeStorageGroup.FromBytes);
+            coreSystem.RegisterMembershipType("locusthives:worker", GenericEntityLogisticsWorker.ToBytes, GenericEntityLogisticsWorker.FromBytes);
 
         }
 
@@ -56,6 +56,17 @@ namespace LocustHives.Game.Logistics
             AiTaskRegistry.Register<AiTaskLocustLogisticsOperation>("doLogisticsAccessTasks");
 
             this.networks = new Dictionary<uint, HiveLogisticsNetwork>();
+
+            // Networks are transient, so we have to make them on load for all the existing
+            // hives which are not transient.
+            this.sapi.Event.SaveGameLoaded += () =>
+            {
+                foreach(var hive in coreSystem.Hives) EnsureNetwork(hive);
+            };
+
+            // And setup events so that we can continue to have a matching network.
+            coreSystem.HiveCreated += EnsureNetwork;
+            coreSystem.HiveDeleted += (id) => networks.Remove(id);
 
             sapi.Event.RegisterGameTickListener((dt) =>
             {
@@ -72,13 +83,19 @@ namespace LocustHives.Game.Logistics
             }, 3000);
         }
 
-        public void EnsureNetwork(uint hiveId)
+        public void EnsureNetwork(HiveHandle hive)
         {
-            if (!networks.ContainsKey(hiveId) && coreSystem.GetHiveOf(hiveId, out var hive))
+            // Ensure a network exists.
+            if (!networks.ContainsKey(hive.Id))
             {
                 // Query coreSystem for members
-                networks[hiveId] = new HiveLogisticsNetwork(sapi, hive.Members);
+                networks[hive.Id] = new HiveLogisticsNetwork(sapi, hive.Members);
             }
+        }
+
+        public override double ExecuteOrder()
+        {
+            return base.ExecuteOrder() + 0.1; // Must be called after hives are all loaded.
         }
 
         public override void AssetsFinalize(ICoreAPI api)

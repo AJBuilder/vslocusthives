@@ -35,28 +35,57 @@ namespace LocustHives.Game.Core
 
         Dictionary<uint, HiveData> hivesById = new Dictionary<uint, HiveData>();
         Dictionary<IHiveMember, HiveData> hivesByMembers = new Dictionary<IHiveMember, HiveData>();
+
         ICoreClientAPI capi;
         ICoreServerAPI sapi;
 
         IClientNetworkChannel clientChannel;
         IServerNetworkChannel serverChannel;
         
-        Dictionary<string, System.Func<byte[], IHiveMember>> deserializers = new Dictionary<string, System.Func<byte[], IHiveMember>>();
+        Dictionary<string, System.Func<byte[], ICoreAPI, IHiveMember>> deserializers = new Dictionary<string, System.Func<byte[], ICoreAPI, IHiveMember>>();
         Dictionary<Type, (string, System.Func<IHiveMember, byte[]>)> serializers = new Dictionary<Type, (string, System.Func<IHiveMember, byte[]>)>();
 
         /// <summary>
+        /// Event fired when a hive is created.
+        /// </summary>
+        public event Action<HiveHandle> HiveCreated;
+
+        /// <summary>
+        /// Event fired when a hive is deleted.
+        /// </summary>
+        public event Action<uint> HiveDeleted;
+
+        /// <summary>
         /// Event fired when membership changes.
-        /// Parameters: (member, previousHiveId, newHiveId)
+        /// Parameters: (Member, Previous Hive, New Hive)
         /// </summary>
         public event Action<IHiveMember, HiveHandle?, HiveHandle?> MemberTuned;
 
-        public Dictionary<uint, HiveMemberSaveData[]> unknownMemberships;
+        public Dictionary<uint, HiveMemberSaveData[]> unknownMemberships = new Dictionary<uint, HiveMemberSaveData[]>();
+
+        public IEnumerable<HiveHandle> Hives => hivesById.Values.Select(hd => MakeHiveHandle(hd));
 
         public override void Start(ICoreAPI api)
         {
             api.RegisterItemClass("ItemHiveTuner", typeof(ItemHiveTuner));
 
-            RegisterMembershipType<GenericBlockMembership>("locusthives:genericblock", GenericBlockMembership.ToBytes, (bytes) => GenericBlockMembership.FromBytes(bytes, api));
+            RegisterMembershipType<GenericBlockMembership>("locusthives:genericblock", GenericBlockMembership.ToBytes, GenericBlockMembership.FromBytes);
+        }
+
+        /// <summary>
+        /// Register a membership type for serialization/deserialization.
+        /// Call this in your mod's Start() method.
+        /// </summary>
+        /// <param name="typeId">Unique type identifier (e.g., "yourmod:customhandle")</param>
+        /// <param name="deserializer">Function to deserialize bytes into handle</param>
+        public void RegisterMembershipType<T>(
+            string typeId,
+            System.Func<T, byte[]> serializerFunc,
+            System.Func<byte[], ICoreAPI, T> deserializerFunc)
+            where T : IHiveMember
+        {
+            deserializers[typeId] = (bytes, api) => deserializerFunc(bytes, api);
+            serializers[typeof(T)] = (typeId, (member) => serializerFunc((T)member));
         }
 
         /// <summary>
@@ -71,8 +100,7 @@ namespace LocustHives.Game.Core
             System.Func<byte[], T> deserializerFunc)
             where T : IHiveMember
         {
-            deserializers[typeId] = (bytes) => deserializerFunc(bytes);
-            serializers[typeof(T)] = (typeId, (member) => serializerFunc((T)member));
+            RegisterMembershipType<T>(typeId, serializerFunc, (bytes, _) => deserializerFunc(bytes));
         }
 
 
@@ -94,6 +122,8 @@ namespace LocustHives.Game.Core
             // Setup broadcasting updates
             serverChannel = sapi.Network.RegisterChannel("locusthivemembership");
             serverChannel.RegisterMessageType<MemberTunedPacket>();
+            serverChannel.RegisterMessageType<HiveCreatedPacket>();
+            serverChannel.RegisterMessageType<HiveDeletedPacket>();
         }
 
         public override void StartClientSide(ICoreClientAPI capi)
@@ -104,19 +134,23 @@ namespace LocustHives.Game.Core
             // Setup accepting updates
             clientChannel = capi.Network.RegisterChannel("locusthivemembership");
             clientChannel.RegisterMessageType<MemberTunedPacket>();
+            clientChannel.RegisterMessageType<HiveCreatedPacket>();
+            clientChannel.RegisterMessageType<HiveDeletedPacket>();
             clientChannel.SetMessageHandler<MemberTunedPacket>((packet) =>
             {
                 if(deserializers.TryGetValue(packet.typeId, out var deserializer))
                 {
-                    IHiveMember member = deserializer(packet.bytes);
+                    IHiveMember member = deserializer(packet.bytes, capi);
                     Tune(member, packet.hiveId.HasValue ? GetOrCreateHive(packet.hiveId.Value) : null);
                 }
             });
+            clientChannel.SetMessageHandler<HiveCreatedPacket>((packet) => GetOrCreateHive(packet.hiveId));
+            clientChannel.SetMessageHandler<HiveDeletedPacket>((packet) => DeleteHive(packet.hiveId));
         }
 
         /// <summary>
         /// Assigns the given member to the given hive.
-        /// Fires MemberTuned event.
+        /// Fires MemberTuned event and if on the server, syncs with the client.
         /// </summary>
         /// <param name="member"></param>
         /// <param name="hiveId"></param>
@@ -131,7 +165,7 @@ namespace LocustHives.Game.Core
             member.OnTuned(prevHandle, handle);
 
             // If server, send update packet
-            if(sapi != null)
+            if(serverChannel != null)
             {
                 if(serializers.TryGetValue(member.GetType(), out var entry))
                 {
@@ -150,7 +184,10 @@ namespace LocustHives.Game.Core
         
         private HiveHandle MakeHiveHandle(HiveData hiveData)
         {
-            return new HiveHandle(hiveData, Tune);
+            /// Tuning doesn't do anything on the client because otherwise
+            /// would have to implement some kind of rollback system for the client.
+            /// Which is overkill considering this doesn't happen often and isn't time sensititve.
+            return new HiveHandle(hiveData, sapi != null ? Tune : null);
         }
 
         private HiveData AssignMembersip(IHiveMember member, HiveData hiveData)
@@ -202,17 +239,21 @@ namespace LocustHives.Game.Core
                     members = new HashSet<IHiveMember>()
                 };
                 hivesById[hiveId] = hiveData;
+                HiveCreated?.Invoke(MakeHiveHandle(hiveData));
             }
+            if(hiveId >= nextHiveId) nextHiveId++;
             return hiveData;
         }
 
         /// <summary>
         /// Creates a new hive that doesn't exist yet.
-        /// Should only be called server side.
+        /// Does nothing on the client.
         /// </summary>
         /// <returns></returns>
         public HiveHandle CreateHive(string name = null)
         {
+            if(sapi == null) throw new InvalidOperationException("Creating hives is only permitted on the server.");
+
             while(hivesById.ContainsKey(nextHiveId)) nextHiveId++;
 
             var hiveData = new HiveData
@@ -224,12 +265,45 @@ namespace LocustHives.Game.Core
 
             hivesById[nextHiveId] = hiveData;
 
+            if(serverChannel != null)
+            {
+                serverChannel.BroadcastPacket(new HiveCreatedPacket{ hiveId = nextHiveId });
+            }
+
             // Post increment for the next time.
             nextHiveId++;
 
             return MakeHiveHandle(hiveData);
         }
 
+        public void DeleteHive(uint id)
+        {
+            if(sapi != null) throw new InvalidOperationException("Creating hives is only permitted on the server.");
+
+            if(hivesById.TryGetValue(id, out var hiveData))
+            {
+                // Zero all members
+                var handle = MakeHiveHandle(hiveData);
+                foreach(var m in hiveData.members)
+                {
+                    hiveData.members.Remove(m);
+                    hivesByMembers.Remove(m);
+                    MemberTuned?.Invoke(m, handle, null);
+                    m.OnTuned(handle, null);
+                }
+
+                // Remove it
+                hivesById.Remove(id);
+                HiveDeleted?.Invoke(id);
+
+
+                // Then update client
+                if(serverChannel != null)
+                {
+                    serverChannel.BroadcastPacket(new HiveDeletedPacket{ hiveId = id });
+                }
+            }
+        }
 
         private void OnWorldSave()
         {
@@ -253,7 +327,7 @@ namespace LocustHives.Game.Core
                                 }
                                 else
                                 {
-                                    // On failure, we can't do anything but drop it
+                                    // Without a serializer, we can't do anything but drop it
                                     sapi.Logger.Error($"The membership type {m.GetType().Name} was not registered. Unable to serialize/save...");
                                     return null;
                                 }
@@ -283,6 +357,7 @@ namespace LocustHives.Game.Core
                 // Create the hive data
                 var hiveData = new HiveData
                 {
+                    id = id,
                     name = hiveSave.name,
                     members = new HashSet<IHiveMember>()
                 };
@@ -294,7 +369,8 @@ namespace LocustHives.Game.Core
                 {
                     if(deserializers.TryGetValue(m.typeId, out var deserializer))
                     {
-                        hiveData.members.Add(deserializer(m.data));
+                        var member = deserializer(m.data, sapi);
+                        AssignMembersip(member, hiveData);
                     }
                     else
                     {

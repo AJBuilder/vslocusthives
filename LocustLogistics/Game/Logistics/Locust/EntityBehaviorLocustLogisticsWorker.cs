@@ -81,9 +81,9 @@ namespace LocustHives.Game.Logistics.Locust
     {
         public event Action TasksCancelled;
 
-        static LogisticsSystem logisticsSystem;
-        static PathfindSystem pathfindSystem;
-        static CoreSystem coreSystem;
+        LogisticsSystem logisticsSystem;
+        PathfindSystem pathfindSystem;
+        CoreSystem coreSystem;
 
         InventoryGeneric inventory;
 
@@ -207,7 +207,7 @@ namespace LocustHives.Game.Logistics.Locust
                 float bestTime = float.MaxValue;
                 foreach (var storage in hive.Members.OfType<ILogisticsStorage>())
                 {
-                    if (skipStorage == storage) continue;
+                    if (storage.Equals(skipStorage)) continue;
 
                     foreach (var method in storage.AccessMethods)
                     {
@@ -337,6 +337,11 @@ namespace LocustHives.Game.Logistics.Locust
                 var promise = new LogisticsPromise(promiseStack.CloneWithSize(promiseSign * (int)Math.Min(requestedCount, bestCount)), promiseTarget);
                 promise.CompletedEvent += (state) =>
                 {
+                    if(state == LogisticsPromiseState.Cancelled){
+                        queuedStorageAccess.Clear();
+                        TasksCancelled?.Invoke();
+                    }
+                    
                     // Release all the reservations
                     for (int i = 0; i < reservations.Length; i++)
                     {
@@ -444,7 +449,7 @@ namespace LocustHives.Game.Logistics.Locust
                         uint availableToTake;
                         foreach (var storage in hive.Members.OfType<ILogisticsStorage>())
                         {
-                            if (storage == target) continue;
+                            if (storage.Equals(target)) continue;
                             foreach (var method in storage.AccessMethods)
                             {
                                 availableToTake = method.CanDo(takeStack);
@@ -532,8 +537,6 @@ namespace LocustHives.Game.Logistics.Locust
         public override void OnEntityDespawn(EntityDespawnData despawn)
         {
             base.OnEntityDespawn(despawn);
-
-            coreSystem.Zero(HiveMembershipHandle);
 
             Cleanup();
         }

@@ -23,7 +23,7 @@ namespace LocustHives.Game.Nexus
 
         public bool IsValid(ICoreAPI api)
         {
-            return api.World.BlockAccessor.GetBlockEntity(position).GetAs<BEBehaviorHiveNexus>() != null;
+            return api.World.BlockAccessor.GetBlockEntity(position)?.GetAs<BEBehaviorHiveNexus>() != null;
         }
 
         public static byte[] ToBytes(NexusMembership handle)
@@ -41,7 +41,7 @@ namespace LocustHives.Game.Nexus
             }
         }
 
-        public static NexusMembership FromBytes(byte[] data, ICoreAPI api)
+        public static NexusMembership FromBytes(byte[] data)
         {
             using (var ms = new MemoryStream(data))
             using (var reader = new BinaryReader(ms))
@@ -57,16 +57,12 @@ namespace LocustHives.Game.Nexus
             }
         }
 
-        public bool Equals(IHiveMember other)
-        {
-            return other is NexusMembership handle &&
-                position != null && handle.position != null &&
-                position.Equals(handle.position);
-        }
 
         public override bool Equals(object obj)
         {
-            return obj is NexusMembership handle && Equals(handle);
+            return obj is NexusMembership handle &&
+                position != null && handle.position != null &&
+                position.Equals(handle.position);
         }
 
         public override int GetHashCode()

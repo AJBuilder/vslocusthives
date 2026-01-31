@@ -47,6 +47,8 @@ namespace LocustHives.Game.Logistics
             }
         }
 
+        public uint CurrentLevel => (uint)(AttachedStorage?.Stacks.Where(s => s.Satisfies(trackedItem)).Sum(s => Math.Max(0, s.StackSize)) ?? 0);
+
         public BEBehaviorHiveStorageRegulator(BlockEntity blockentity) : base(blockentity)
         {
         }
@@ -70,7 +72,7 @@ namespace LocustHives.Game.Logistics
                 Blockentity.RegisterGameTickListener((dt) =>
                 {
                     CheckInventoryLevel();
-                }, 3000);
+                }, 15000);
             }
         }
 
@@ -88,31 +90,45 @@ namespace LocustHives.Game.Logistics
 
             var targetCount = (uint)Math.Max(0, trackedItem.StackSize);
 
-            var promised = promises
-                    .Where(p => p.State == LogisticsPromiseState.Unfulfilled)
-                    .Sum(p => p.Stack.StackSize);
-
-            var need = (int)targetCount - (int)currentLevel - promised;
+            var need = (int)targetCount - (int)currentLevel;
             if(need != 0)
             {
-                var stack = trackedItem.CloneWithSize(need);
 
-                if (storage is IHiveMember member && coreSystem.GetHiveOf(member, out var hive))
-                {
-                    var promise = logisticsSystem.GetNetworkFor(hive.Id)?.Request(stack, AttachedStorage);
-                    if (promise != null)
-                    {
-                        promise.CompletedEvent += (state) =>
-                        {
-                            promises.Remove(promise);
-                            Blockentity.MarkDirty();
-                            CheckInventoryLevel();
-                        };
-                        promises.Add(promise);
-                        Blockentity.MarkDirty();
-                    }
+                var promised = promises
+                        .Where(p => p.State == LogisticsPromiseState.Unfulfilled)
+                        .Sum(p => p.Stack.StackSize);
+
+                // If sign of the need changed (i.e. promised and need have different signs)
+                // Cancel all promises. This assumes that all promises are of the same sign, which this
+                // logic should guarantee?
+                // If the need is zero, this also cancels promises
+                if((need == 0) || (need > 0 != promised > 0)) {
+                    while(promises.Count > 0) promises.First().Cancel();
+                    promised = 0;
                 }
 
+                var adjusted = need - promised;
+
+                if(adjusted != 0)
+                {
+                    var stack = trackedItem.CloneWithSize(adjusted);
+
+                    if (storage is IHiveMember member && coreSystem.GetHiveOf(member, out var hive))
+                    {
+                        var promise = logisticsSystem.GetNetworkFor(hive.Id)?.Request(stack, AttachedStorage);
+                        if (promise != null)
+                        {
+                            promise.CompletedEvent += (state) =>
+                            {
+                                promises.Remove(promise);
+                                Blockentity.MarkDirty();
+                                if(state == LogisticsPromiseState.Fulfilled) CheckInventoryLevel();
+                            };
+                            promises.Add(promise);
+                            Blockentity.MarkDirty();
+                        }
+                    }
+                }
             }
         }
 

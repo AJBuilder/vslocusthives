@@ -96,17 +96,11 @@ namespace LocustHives.Systems.Logistics
             return api.World.BlockAccessor.GetBlockEntity(position)?.GetBehavior<ILogisticsStorage>();
         }
 
-        // Equality based on position
-        public bool Equals(IHiveMember other)
-        {
-            return other is GenericBlockEntityLogisticsStorage handle &&
-                   position != null && handle.position != null &&
-                   position.Equals(handle.position);
-        }
-
         public override bool Equals(object obj)
         {
-            return obj is GenericBlockEntityLogisticsStorage handle && Equals(handle);
+            return obj is GenericBlockEntityLogisticsStorage handle &&
+                   position != null && handle.position != null &&
+                   position.Equals(handle.position);
         }
 
         public override int GetHashCode()

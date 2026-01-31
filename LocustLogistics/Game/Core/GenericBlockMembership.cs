@@ -45,7 +45,7 @@ namespace LocustHives.Systems.Logistics
             }
         }
 
-        public static GenericBlockMembership FromBytes(byte[] data, ICoreAPI api)
+        public static GenericBlockMembership FromBytes(byte[] data)
         {
             using (var ms = new MemoryStream(data))
             using (var reader = new BinaryReader(ms))
@@ -61,16 +61,11 @@ namespace LocustHives.Systems.Logistics
             }
         }
 
-        public bool Equals(IHiveMember other)
-        {
-            return other is GenericBlockMembership handle &&
-                   position != null && handle.position != null &&
-                   position.Equals(handle.position);
-        }
-
         public override bool Equals(object obj)
         {
-            return obj is GenericBlockMembership handle && Equals(handle);
+            return obj is GenericBlockMembership handle &&
+                   position != null && handle.position != null &&
+                   position.Equals(handle.position);
         }
 
         public override int GetHashCode()

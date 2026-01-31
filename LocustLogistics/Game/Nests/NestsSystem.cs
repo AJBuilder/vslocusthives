@@ -36,7 +36,7 @@ namespace LocustHives.Game.Nests
             api.RegisterBlockClass("BlockTamedLocustNest", typeof(BlockTamedLocustNest));
 
             coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
-            coreSystem.RegisterMembershipType("locusthives:nest", NestHandle.ToBytes, (bytes) => NestHandle.FromBytes(bytes, api));
+            coreSystem.RegisterMembershipType("locusthives:nest", NestHandle.ToBytes, NestHandle.FromBytes);
         }
 
         public override void StartServerSide(ICoreServerAPI api)

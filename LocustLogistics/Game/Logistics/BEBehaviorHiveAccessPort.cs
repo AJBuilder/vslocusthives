@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -144,6 +145,17 @@ namespace LocustHives.Game.Logistics
             // Don't detune on unload - membership persists!
             // Just cleanup reservations
             CleanupLogistics();
+        }
+
+        public override void GetBlockInfo(IPlayer forPlayer, StringBuilder dsc)
+        {
+            base.GetBlockInfo(forPlayer, dsc);
+
+            if(coreSystem.GetHiveOf(HiveMembershipHandle, out var hive))
+            {
+                dsc.AppendLine($"Hive: {hive.Name}");
+            }
+
         }
 
         public void CleanupLogistics()

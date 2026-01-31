@@ -6,10 +6,8 @@ namespace LocustHives.Game.Core
 {
     /// <summary>
     /// Core interface for hive membership.
-    /// The implementation must have a stable identity throughout the loading/unloading
-    /// of chunks and the world. (i.e block position, entity id, etc.)
     /// </summary>
-    public interface IHiveMember : IEquatable<IHiveMember>
+    public interface IHiveMember
     {
         /// <summary>
         /// Checks if this handle still refers to a valid object in the world.

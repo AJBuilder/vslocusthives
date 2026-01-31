@@ -125,17 +125,15 @@ namespace LocustHives.Systems.Logistics
 
         public uint TryTakeOut(IStorageLattice origin, ItemStack stack, ItemSlot sinkSlot)
         {
-            uint remaining = (uint)Math.Max(0, stack.StackSize);
-            if(remaining <= 0) return 0;
+            uint quantity = (uint)Math.Max(0, stack.StackSize);
+            if(quantity == 0) return 0;
             uint transfered = 0;
 
             foreach(var l in TraverseConnected(origin, api))
             {
-                var clone = stack.CloneWithSize((int)remaining);
-                var moved = l.TryTakeOut(clone, sinkSlot);
-                remaining -= moved;
-                if(remaining <= 0) break;
-                transfered += moved;
+                var clone = stack.CloneWithSize((int)(quantity - transfered));
+                transfered += l.TryTakeOut(clone, sinkSlot);
+                if(transfered >= quantity) break;
             }
 
             return transfered;
@@ -143,20 +141,13 @@ namespace LocustHives.Systems.Logistics
 
         public uint TryPutInto(IStorageLattice origin, ItemSlot sourceSlot, uint quantity)
         {
-            var stack = sourceSlot.Itemstack;
-            if (stack == null) return 0;
-
-            uint remaining = quantity;
-            if(remaining <= 0) return 0;
+            if(quantity == 0) return 0;
             uint transfered = 0;
 
             foreach(var l in TraverseConnected(origin, api))
             {
-                var clone = stack.CloneWithSize((int)remaining);
-                var moved = l.TryPutInto(sourceSlot, quantity);
-                remaining -= moved;
-                if(remaining <= 0) break;
-                transfered += moved;
+                transfered += l.TryPutInto(sourceSlot, quantity - transfered);
+                if(transfered >= quantity) break;
             }
 
             return transfered;
@@ -243,10 +234,9 @@ namespace LocustHives.Systems.Logistics
             }
         }
 
-        // Equality based on canonical position
-        public bool Equals(IHiveMember other)
+        public override bool Equals(object obj)
         {
-            return other is LatticeStorageGroup handle &&
+            return obj is LatticeStorageGroup handle &&
                    positions != null && handle.positions != null &&
                    positions.SetEquals(handle.positions);
         }
