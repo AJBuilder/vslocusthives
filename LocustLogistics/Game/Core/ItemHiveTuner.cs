@@ -19,13 +19,13 @@ namespace LocustHives.Game.Core
     }
     public class ItemHiveTuner : Item
     {
-        TuningSystem tuningSystem;
+        CoreSystem coreSystem;
         SkillItem[] toolModes;
 
         public override void OnLoaded(ICoreAPI api)
         {
             base.OnLoaded(api);
-            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
+            coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
             ICoreClientAPI capi = api as ICoreClientAPI;
 
 
@@ -63,6 +63,7 @@ namespace LocustHives.Game.Core
         public override void OnHeldInteractStart(ItemSlot slot, EntityAgent byEntity, BlockSelection blockSel, EntitySelection entitySel, bool firstEvent, ref EnumHandHandling handling)
         {
             IHiveTunable target = null;
+            bool canBeTuned = true;
             if (blockSel != null)
             {
                 BlockPos onBlockPos = blockSel.Position;
@@ -76,46 +77,35 @@ namespace LocustHives.Game.Core
                     BlockEntity be = byEntity.World.BlockAccessor.GetBlockEntity(onBlockPos);
                     if(be != null)
                     {
-                        target = be as IHiveTunable;
+                        canBeTuned = be.Block.Attributes?["canBeTuned"].AsBool(true) ?? true;
+                        target = be.GetAs<IHiveTunable>();
                     }
                 }
             }
             else if (entitySel != null)
             {
-                target = entitySel.Entity as IHiveTunable;
+                canBeTuned = entitySel.Entity.Attributes?.GetBool("canBeTuned", true) ?? true;
+                target = entitySel.Entity.GetAs<IHiveTunable>();
             }
 
             var attributes = slot.Itemstack.Attributes;
             var mode = (HiveTunerMode)Math.Min(toolModes.Length - 1, attributes.GetInt("toolMode"));
 
-            // If there is no target, and mode is calibrate, clear the calibration
-            if (target == null)
-            {
-                if(mode == HiveTunerMode.Calibrate)
-                {
-                    handling = EnumHandHandling.PreventDefaultAction;
-                    attributes.RemoveAttribute("calibratedHive");
-                    if (api is ICoreClientAPI capi) capi.ShowChatMessage($"Cleared calibration.");
-                }
-            }
-            else
-            {
-                // If there is a target, operate on it.
+            if (target != null) {
                 handling = EnumHandHandling.PreventDefaultAction;
-                var handle = target.GetHiveMemberHandle();
+                var handle = target.HiveMembershipHandle;
 
                 switch (mode)
                 {
                     case HiveTunerMode.Calibrate:
                         {
-                            // Look up in registry
-                            if (tuningSystem.GetMembershipOf(handle, out var hiveId))
+                            if (coreSystem.GetHiveOf(handle, out var hive))
                             {
                                 if (api is ICoreClientAPI capi)
                                 {
-                                    capi.ShowChatMessage($"Calibrated to Hive {hiveId}");
+                                    capi.ShowChatMessage($"Calibrated to Hive {hive.Name}");
                                 }
-                                attributes.SetInt("calibratedHive", hiveId);
+                                attributes.SetInt("calibratedHive", (int)hive.Id);
                             }
                             else if (api is ICoreClientAPI capi)
                             {
@@ -128,13 +118,21 @@ namespace LocustHives.Game.Core
                             var hiveId = attributes.TryGetInt("calibratedHive");
                             if (hiveId.HasValue)
                             {
-                                if(api is ICoreClientAPI capi)
+                                if (canBeTuned)
                                 {
-                                    capi.ShowChatMessage($"Tuned to Hive {hiveId.Value}");
-                                }
-                                else
+                                    if(coreSystem.GetHiveOf((uint)hiveId.Value, out var hive)){
+                                        if(api is ICoreClientAPI capi)
+                                        {
+                                            capi.ShowChatMessage($"Tuned to Hive {hive.Name} ({(uint)hiveId.Value})");
+                                        }
+                                        hive.Tune(handle);
+                                    } else if(api is ICoreClientAPI capi)
+                                    {
+                                        capi.ShowChatMessage("Calibrated hive no longer exists.");
+                                    }
+                                } else if (api is ICoreClientAPI capi)
                                 {
-                                    tuningSystem.Tune(handle, hiveId.Value);
+                                    capi.TriggerIngameError(this, "Untunable", "The tuning of this cannot be changed.");
                                 }
 
                                 // Not sure I like this logic here...
@@ -151,15 +149,21 @@ namespace LocustHives.Game.Core
                         break;
                     case HiveTunerMode.Zero:
                         {
-                            if (api is ICoreClientAPI capi) capi.TriggerIngameDiscovery(this, "Zeroed target", $"Removed Hive tuning.");
-                            else tuningSystem.Tune(handle, null);
+                            if (canBeTuned)
+                            {
+                                coreSystem.Zero(handle);
+                                if (api is ICoreClientAPI capi) capi.TriggerIngameDiscovery(this, "Zeroed target", $"Zeroed tuning.");
 
-                            // Not sure I like this logic here...
-                            // But let's just set the guardedPlayer or guardedEntity whenever we zero
-                            var player = byEntity as EntityPlayer;
-                            if (player != null) entitySel?.Entity.WatchedAttributes.SetString("guardedPlayerUid", player.PlayerUID);
-                            else entitySel?.Entity.WatchedAttributes.SetLong("guardedEntityId", byEntity.EntityId);
-                            entitySel?.Entity.WatchedAttributes.SetString("guardedName", byEntity.GetName() ?? "");
+                                // Not sure I like this logic here...
+                                // But let's just set the guardedPlayer or guardedEntity whenever we zero
+                                var player = byEntity as EntityPlayer;
+                                if (player != null) entitySel?.Entity.WatchedAttributes.SetString("guardedPlayerUid", player.PlayerUID);
+                                else entitySel?.Entity.WatchedAttributes.SetLong("guardedEntityId", byEntity.EntityId);
+                                entitySel?.Entity.WatchedAttributes.SetString("guardedName", byEntity.GetName() ?? "");
+                            } else if (api is ICoreClientAPI capi)
+                            {
+                                capi.TriggerIngameError(this, "Unzeroable", "This cannot be zeroed");
+                            }
                         }
                         break;
                 }
@@ -185,7 +189,14 @@ namespace LocustHives.Game.Core
         {
             base.GetHeldItemInfo(inSlot, dsc, world, withDebugInfo);
             var id = inSlot.Itemstack.Attributes.TryGetInt("calibratedHive");
-            dsc.AppendLine($"Calibrated Hive: {(id.HasValue ? id.Value : "None")}");
+            if(id.HasValue && coreSystem.GetHiveOf((uint)id, out var hive))
+            {
+                dsc.AppendLine($"Calibrated Hive: {hive.Name}");
+            }
+            else
+            {
+                dsc.AppendLine("Calibrated hive no longer exists");
+            }
         }
     }
 }

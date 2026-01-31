@@ -16,7 +16,7 @@ namespace LocustHives.Systems.Membership
         Dictionary<int, HashSet<T>> membersByMembership = new Dictionary<int, HashSet<T>>();
         Dictionary<T, int> membershipByMembers = new Dictionary<T, int>();
 
-        public bool GetMembershipOf(T member, out int membership)
+        public bool GetHiveOf(T member, out int membership)
         {
             if(membershipByMembers.TryGetValue(member, out membership)) return true;
             return false;

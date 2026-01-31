@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -252,7 +253,15 @@ namespace LocustHives.Systems.Logistics
 
         public override int GetHashCode()
         {
-            return positions?.GetHashCode() ?? 0;
+            unchecked
+            {
+                int hash = 0;
+                foreach (var p in positions)
+                {
+                    hash ^= p.GetHashCode(); // order-independent
+                }
+                return hash;
+            }
         }
     }
 }

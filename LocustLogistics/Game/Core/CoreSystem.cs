@@ -29,12 +29,12 @@ namespace LocustHives.Game.Core
     /// <summary>
     /// This mod system tracks things that are tuned to a hive.
     /// </summary>
-    public class TuningSystem : ModSystem
+    public class CoreSystem : ModSystem
     {
-        int nextHiveId;
+        uint nextHiveId;
 
-        Dictionary<int, HiveData> allHiveData = new Dictionary<int, HiveData>();
-        Dictionary<IHiveMember, int> hivesByMembers = new Dictionary<IHiveMember, int>();
+        Dictionary<uint, HiveData> hivesById = new Dictionary<uint, HiveData>();
+        Dictionary<IHiveMember, HiveData> hivesByMembers = new Dictionary<IHiveMember, HiveData>();
         ICoreClientAPI capi;
         ICoreServerAPI sapi;
 
@@ -48,20 +48,15 @@ namespace LocustHives.Game.Core
         /// Event fired when membership changes.
         /// Parameters: (member, previousHiveId, newHiveId)
         /// </summary>
-        public event Action<IHiveMember, int?, int?> MemberTuned;
+        public event Action<IHiveMember, HiveHandle?, HiveHandle?> MemberTuned;
 
-        public Dictionary<int, HiveMemberSaveData[]> unknownMemberships;
+        public Dictionary<uint, HiveMemberSaveData[]> unknownMemberships;
 
         public override void Start(ICoreAPI api)
         {
             api.RegisterItemClass("ItemHiveTuner", typeof(ItemHiveTuner));
 
-            var test = RuntimeTypeModel.Create();
-
-
-            // Register built-in handle types
-            // Notify member
-            MemberTuned += (member, prevHiveId, hiveId) => member.OnTuned(prevHiveId, hiveId);
+            RegisterMembershipType<GenericBlockMembership>("locusthives:genericblock", GenericBlockMembership.ToBytes, (bytes) => GenericBlockMembership.FromBytes(bytes, api));
         }
 
         /// <summary>
@@ -87,8 +82,8 @@ namespace LocustHives.Game.Core
             this.sapi = sapi;
 
             sapi.Event.GameWorldSave += OnWorldSave;
-
             sapi.Event.SaveGameLoaded += OnWorldLoad;
+            sapi.Event.PlayerJoin += OnPlayerJoin;
 
             // Periodic cleanup of stale handles
             sapi.Event.RegisterGameTickListener((dt) =>
@@ -98,26 +93,7 @@ namespace LocustHives.Game.Core
 
             // Setup broadcasting updates
             serverChannel = sapi.Network.RegisterChannel("locusthivemembership");
-            serverChannel.RegisterMessageType<MembershipUpdatePacket>();
-            MemberTuned += (member, prevHiveId, hiveId) =>
-            {
-                if(serializers.TryGetValue(member.GetType(), out var entry))
-                {
-                    var (typeId, serializer) = entry;
-                    serverChannel.BroadcastPacket(new MembershipUpdatePacket
-                    {
-                        updates = [
-                            new MembershipUpdate
-                            {
-                                typeId = typeId,
-                                prevHiveId = prevHiveId,
-                                hiveId = hiveId,
-                                bytes = serializer(member)
-                            }
-                        ]
-                    });
-                }
-            };
+            serverChannel.RegisterMessageType<MemberTunedPacket>();
         }
 
         public override void StartClientSide(ICoreClientAPI capi)
@@ -127,110 +103,107 @@ namespace LocustHives.Game.Core
 
             // Setup accepting updates
             clientChannel = capi.Network.RegisterChannel("locusthivemembership");
-            clientChannel.RegisterMessageType<MembershipUpdatePacket>();
-            clientChannel.SetMessageHandler<MembershipUpdatePacket>((packet) =>
+            clientChannel.RegisterMessageType<MemberTunedPacket>();
+            clientChannel.SetMessageHandler<MemberTunedPacket>((packet) =>
             {
-                if(packet.updates == null) return;
-
-                foreach(var update in packet.updates)
+                if(deserializers.TryGetValue(packet.typeId, out var deserializer))
                 {
-                    if(deserializers.TryGetValue(update.typeId, out var deserializer))
-                    {
-                        IHiveMember member = deserializer(update.bytes);
-                        AssignMembersip(member, update.hiveId);
-                        if (update.isSync)
-                        {
-                            MemberTuned?.Invoke(member, update.prevHiveId, update.hiveId);
-                        }
-                    }
+                    IHiveMember member = deserializer(packet.bytes);
+                    Tune(member, packet.hiveId.HasValue ? GetOrCreateHive(packet.hiveId.Value) : null);
                 }
             });
         }
 
         /// <summary>
         /// Assigns the given member to the given hive.
-        /// Fires MemberTuned event and calls the member's OnTuned method.
+        /// Fires MemberTuned event.
         /// </summary>
         /// <param name="member"></param>
         /// <param name="hiveId"></param>
-        public void Tune(IHiveMember member, int? hiveId)
+        private void Tune(IHiveMember member, HiveData hiveData)
         {
-            var prevHiveId = AssignMembersip(member, hiveId);
-            MemberTuned?.Invoke(member, prevHiveId, hiveId);
+            var prevHive = AssignMembersip(member, hiveData);
+            HiveHandle? prevHandle = prevHive == null ? null : MakeHiveHandle(prevHive);
+            HiveHandle? handle = hiveData == null ? null : MakeHiveHandle(hiveData);
+
+            // Fire events
+            MemberTuned?.Invoke(member, prevHandle, handle);
+            member.OnTuned(prevHandle, handle);
+
+            // If server, send update packet
+            if(sapi != null)
+            {
+                if(serializers.TryGetValue(member.GetType(), out var entry))
+                {
+                    var (typeId, serializer) = entry;
+                    serverChannel.BroadcastPacket(new MemberTunedPacket
+                    {
+                        typeId = typeId,
+                        hiveId = hiveData == null ? null : hiveData.id,
+                        bytes = serializer(member)
+                    });
+                }
+            }
         }
 
-        /// <summary>
-        /// Assigns the given member to the given membership.
-        /// </summary>
-        /// <param name="member"></param>
-        /// <param name="hiveId"></param>
-        /// <returns></returns>
-        private int? AssignMembersip(IHiveMember member, int? hiveId)
+        public void Zero(IHiveMember member) => Tune(member, null);
+        
+        private HiveHandle MakeHiveHandle(HiveData hiveData)
+        {
+            return new HiveHandle(hiveData, Tune);
+        }
+
+        private HiveData AssignMembersip(IHiveMember member, HiveData hiveData)
         {
             
             // Remove any old membership
-            int? prevHiveId = null;
-            if (hivesByMembers.TryGetValue(member, out var old))
+            if (hivesByMembers.TryGetValue(member, out var prevHive))
             {
-                prevHiveId = old;
-                if (prevHiveId == hiveId) return prevHiveId; // Already a member.
-                allHiveData[old].members.Remove(member);
+                if (prevHive == hiveData) return hiveData; // Already a member.
+                prevHive.members.Remove(member);
             }
-            else if (!hiveId.HasValue) return null; // Already has no membership
 
-            if (hiveId.HasValue)
+            // Now assign new membership
+            if (hiveData != null)
             {
-                // Now assign new membership
-                hivesByMembers[member] = hiveId.Value;
-
-                // Cache reverse relationship
-                if (!allHiveData.TryGetValue(hiveId.Value, out var hiveData))
-                {
-                    hiveData = new HiveData();
-                    allHiveData[hiveId.Value] = hiveData;
-                }
+                hivesByMembers[member] = hiveData;
                 hiveData.members.Add(member);
             }
-            return prevHiveId;
+            else
+            {
+                hivesByMembers.Remove(member);
+            }
+
+            return prevHive;
         }
 
-        public bool GetMembershipOf(IHiveMember member, out int hiveId)
+        public bool GetHiveOf(IHiveMember member, out HiveHandle hive)
         {
-            if(hivesByMembers.TryGetValue(member, out hiveId)) return true;
-            return false;
+            var exists = hivesByMembers.TryGetValue(member, out var hiveData);
+            hive = MakeHiveHandle(hiveData);
+            return exists;
         }
 
-        /// <summary>
-        /// Get the set of all members assigned to the given hive.
-        /// 
-        /// The lifetime of the set is from the first member being tuned to
-        /// that hive, till the end of this mod system.
-        /// </summary>
-        /// <param name="hiveId"></param>
-        /// <returns></returns>
-        public IReadOnlySet<IHiveMember> GetMembersOf(int hiveId)
+        public bool GetHiveOf(uint id, out HiveHandle hive)
         {
-            if (!this.allHiveData.TryGetValue(hiveId, out var hiveData))
+            var exists = hivesById.TryGetValue(id, out var hiveData);
+            hive = MakeHiveHandle(hiveData);
+            return exists;
+        }
+
+        private HiveData GetOrCreateHive(uint hiveId)
+        {
+            if(!hivesById.TryGetValue(hiveId, out var hiveData))
             {
                 hiveData = new HiveData
                 {
-                    name = $"#{hiveId}",
+                    id = hiveId,
+                    name = $"#{nextHiveId}",
                     members = new HashSet<IHiveMember>()
                 };
-                allHiveData[hiveId] = hiveData;
+                hivesById[hiveId] = hiveData;
             }
-            return hiveData.members;
-        }
-
-        public bool GetNameOf(int hiveId, out string name)
-        {
-            if(allHiveData.TryGetValue(hiveId, out var hiveData))
-            {
-                name = hiveData.name;
-                return true;
-            }
-            name = null;
-            return false;
+            return hiveData;
         }
 
         /// <summary>
@@ -238,32 +211,35 @@ namespace LocustHives.Game.Core
         /// Should only be called server side.
         /// </summary>
         /// <returns></returns>
-        public int CreateHive(string name = null)
+        public HiveHandle CreateHive(string name = null)
         {
-            while(allHiveData.ContainsKey(nextHiveId)) nextHiveId++;
+            while(hivesById.ContainsKey(nextHiveId)) nextHiveId++;
 
             var hiveData = new HiveData
                 {
+                    id = nextHiveId,
                     name = name ?? $"#{nextHiveId}",
                     members = new HashSet<IHiveMember>()
                 };
 
-            allHiveData[nextHiveId] = hiveData;
+            hivesById[nextHiveId] = hiveData;
 
             // Post increment for the next time.
-            return nextHiveId++;
+            nextHiveId++;
+
+            return MakeHiveHandle(hiveData);
         }
 
 
         private void OnWorldSave()
         {
-            var hiveSaveData = new Dictionary<int, HiveSaveData>();
-            foreach(var (id, h) in allHiveData)
+            var hiveSaveData = new Dictionary<uint, HiveSaveData>();
+            foreach(var (id , hive) in hivesById)
             {
                 hiveSaveData[id] = new HiveSaveData
                 {
-                    name=h.name,
-                    members=h.members
+                    name=hive.name,
+                    members=hive.members
                         .Select(m =>
                             {
                                 // Try to serialize each member
@@ -292,7 +268,6 @@ namespace LocustHives.Game.Core
             var saveData = new CoreSaveData
             {
                 hives = hiveSaveData,
-                nextHiveId = nextHiveId
             };
 
             sapi.WorldManager.SaveGame.StoreData("LocustHivesMembership", SerializerUtil.Serialize(saveData));
@@ -300,29 +275,26 @@ namespace LocustHives.Game.Core
 
         private void OnWorldLoad()
         {
-            var bytes = sapi.WorldManager.SaveGame.GetData<byte[]>("LocustHivesMembership");
-            if(bytes == null) return;
-
-            var saveData = SerializerUtil.Deserialize<CoreSaveData>(bytes);
+            var saveData = sapi.WorldManager.SaveGame.GetData<CoreSaveData>("LocustHivesMembership");
 
             // Restore hives
-            foreach(var (id, h) in saveData.hives)
+            foreach(var (id, hiveSave) in saveData.hives)
             {
                 // Create the hive data
-                var hive = new HiveData
+                var hiveData = new HiveData
                 {
-                    name = h.name,
+                    name = hiveSave.name,
                     members = new HashSet<IHiveMember>()
                 };
-                allHiveData[id] = hive;
+                hivesById[id] = hiveData;
 
                 // Try to deserialize the members
-                var unknown = new List<HiveMemberSaveData>(h.members.Length);
-                foreach(var m in h.members)
+                var unknown = new List<HiveMemberSaveData>(hiveSave.members.Length);
+                foreach(var m in hiveSave.members)
                 {
                     if(deserializers.TryGetValue(m.typeId, out var deserializer))
                     {
-                        hive.members.Add(deserializer(m.data));
+                        hiveData.members.Add(deserializer(m.data));
                     }
                     else
                     {
@@ -333,7 +305,28 @@ namespace LocustHives.Game.Core
                 unknownMemberships[id] = unknown.ToArray();
             }
 
-            nextHiveId = saveData.nextHiveId;
+        }
+
+        private void OnPlayerJoin(IServerPlayer player)
+        {
+            // For now, just blast them with packets... should probably do a bulk packet
+            foreach(var (member, hiveData) in hivesByMembers)
+            {
+                if(serializers.TryGetValue(member.GetType(), out var entry))
+                {
+                    var (typeId, serializer) = entry;
+                    serverChannel.BroadcastPacket(new MemberTunedPacket
+                    {
+                        typeId = typeId,
+                        hiveId = hiveData == null ? null : hiveData.id,
+                        bytes = serializer(member)
+                    });
+                }
+                else
+                {
+                    sapi.Logger.Error($"No serializer registered for {member.GetType().Name}. Unable to sync to client.");
+                }
+            }
         }
 
         private void CleanupStaleHandles()

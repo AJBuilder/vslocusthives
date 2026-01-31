@@ -24,19 +24,19 @@ namespace LocustHives.Game.Nests
 {
     /// <summary>
     /// This mod system manages nest-related functionality.
-    /// Queries TuningSystem for nest membership.
+    /// Queries coreSystem for nest membership.
     /// </summary>
     public class NestsSystem : ModSystem
     {
-        TuningSystem tuningSystem;
+        CoreSystem coreSystem;
 
         public override void Start(ICoreAPI api)
         {
             api.RegisterBlockEntityBehaviorClass("HiveLocustNest", typeof(BEBehaviorHiveLocustNest));
             api.RegisterBlockClass("BlockTamedLocustNest", typeof(BlockTamedLocustNest));
 
-            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
-            tuningSystem.RegisterMembershipType("locusthives:nest", NestHandle.ToBytes, (bytes) => NestHandle.FromBytes(bytes, api));
+            coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
+            coreSystem.RegisterMembershipType("locusthives:nest", NestHandle.ToBytes, (bytes) => NestHandle.FromBytes(bytes, api));
         }
 
         public override void StartServerSide(ICoreServerAPI api)
@@ -48,10 +48,10 @@ namespace LocustHives.Game.Nests
         /// <summary>
         /// Get all nests of a specific hive.
         /// </summary>
-        public IEnumerable<ILocustNest> GetNestsOfHive(int hiveId)
-        {
-            return tuningSystem.GetMembersOf(hiveId).OfType<ILocustNest>();
-        }
+        //public IEnumerable<ILocustNest> GetNestsOfHive(int hiveId)
+        //{
+        //    return coreSystem.GetHiveOf(hiveId).OfType<ILocustNest>();
+        //}
 
         public override void AssetsFinalize(ICoreAPI api)
         {

@@ -101,7 +101,7 @@ namespace LocustHives.Systems.Nests
 
         public override int GetHashCode()
         {
-            return position?.GetHashCode() ?? 0;
+            return position.GetHashCode();
         }
 
         public static bool operator ==(NestHandle left, NestHandle right)

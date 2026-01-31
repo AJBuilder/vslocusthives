@@ -18,7 +18,7 @@ namespace LocustHives.Game.Nest
 {
     public class BEBehaviorHiveLocustNest : BlockEntityBehavior, ILocustNest, IHiveTunable
     {
-        TuningSystem tuningSystem;
+        CoreSystem coreSystem;
         //List<(string code, byte[] data)> storedLocustData;
 
         //public IEnumerable<EntityLocust> StoredLocusts
@@ -40,10 +40,7 @@ namespace LocustHives.Game.Nest
 
 
         // IHiveTunable implementation
-        public IHiveMember GetHiveMemberHandle()
-        {
-            return new NestHandle(Blockentity.Pos, Api);
-        }
+        public IHiveMember HiveMembershipHandle => new NestHandle(Blockentity.Pos, Api);
 
         public BEBehaviorHiveLocustNest(BlockEntity blockentity) : base(blockentity)
         {
@@ -53,15 +50,14 @@ namespace LocustHives.Game.Nest
         public override void Initialize(ICoreAPI api, JsonObject properties)
         {
             base.Initialize(api, properties);
-            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
+            coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
         }
 
         public override void OnBlockRemoved()
         {
             base.OnBlockRemoved();
 
-            // Detune from hive
-            tuningSystem?.TryTune(this, null);
+            coreSystem.Zero(HiveMembershipHandle);
 
             //for(var i = storedLocustData.Count; i > 0; i--)
             //{

@@ -29,14 +29,11 @@ namespace LocustHives.Game.Logistics.Lattice
         InventoryBase inventory;
         HashSet<LogisticsReservation> reservations;
         LogisticsSystem logisticsSystem;
-        TuningSystem tuningSystem;
+        CoreSystem coreSystem;
 
 
         // IHiveTunable implementation
-        public IHiveMember GetHiveMemberHandle()
-        {
-            return LatticeStorageGroup.FromConnected(this, Api);
-        }
+        public IHiveMember HiveMembershipHandle => LatticeStorageGroup.FromConnected(this, Api);
 
 
         public IEnumerable<ItemStack> Stacks
@@ -79,7 +76,7 @@ namespace LocustHives.Game.Logistics.Lattice
 
             base.Initialize(api);
 
-            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
+            coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
             if (api is ICoreServerAPI sapi)
             {
                 logisticsSystem = sapi.ModLoader.GetModSystem<LogisticsSystem>();
@@ -153,12 +150,10 @@ namespace LocustHives.Game.Logistics.Lattice
                 r.Release();
             }
 
-            var handle = GetHiveMemberHandle();
-            if(tuningSystem.GetMembershipOf(handle, out var hiveId))
+            var handle = HiveMembershipHandle;
+            if(coreSystem.GetHiveOf(handle, out var hive))
             {
-
-                // Detune from hive
-                tuningSystem.Tune(handle, null);
+                coreSystem.Zero(handle);
 
                 // And retune all the neighbors
                 // TODO: Skip a neighbor if it already got updated.
@@ -168,7 +163,7 @@ namespace LocustHives.Game.Logistics.Lattice
                     if(lattice != null)
                     {
                         var group = LatticeStorageGroup.FromConnected(lattice, Api);
-                        tuningSystem.Tune(group, hiveId);
+                        hive.Tune(group);
                     }
                 }
                 
@@ -179,6 +174,11 @@ namespace LocustHives.Game.Logistics.Lattice
         {
             base.GetBlockInfo(forPlayer, dsc);
 
+            if(coreSystem.GetHiveOf(HiveMembershipHandle, out var hive))
+            {
+                dsc.AppendLine($"Hive: {hive.Name}");
+            }
+            
             if (!inventory.Empty)
             {
                 dsc.AppendLine($"Contains: \n{string.Join("\n", inventory

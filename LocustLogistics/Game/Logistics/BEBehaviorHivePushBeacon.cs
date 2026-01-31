@@ -50,7 +50,7 @@ namespace LocustHives.Game.Logistics
     {
         BlockFacing facing;
         LogisticsSystem logisticsSystem;
-        TuningSystem tuningSystem;
+        CoreSystem coreSystem;
         List<LogisticsPromise> requests;
         int clientRequestCount;
 
@@ -61,7 +61,7 @@ namespace LocustHives.Game.Logistics
                 if (facing == null) return null;
                 BlockPos targetPos = Pos.AddCopy(facing.Opposite);
                 var be = Api.World.BlockAccessor.GetBlockEntity(targetPos);
-                return be?.GetAs<IHiveTunable>()?.GetHiveMemberHandle() as ILogisticsStorage;
+                return be?.GetAs<IHiveTunable>()?.HiveMembershipHandle as ILogisticsStorage;
             }
         }
 
@@ -70,9 +70,9 @@ namespace LocustHives.Game.Logistics
             get
             {
                 var storage = AttachedStorage;
-                if (storage is IHiveMember member && tuningSystem.GetMembershipOf(member, out var hiveId))
+                if (storage is IHiveMember member && coreSystem.GetHiveOf(member, out var hive))
                 {
-                    return logisticsSystem.GetNetworkFor(hiveId);
+                    return logisticsSystem.GetNetworkFor(hive.Id);
                 }
                 else
                 {
@@ -90,7 +90,7 @@ namespace LocustHives.Game.Logistics
         {
             base.Initialize(api, properties);
 
-            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
+            coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
             if(api is ICoreServerAPI)
             {
                 requests = new List<LogisticsPromise>();

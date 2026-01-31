@@ -23,7 +23,7 @@ namespace LocustHives.Game.Logistics
         // Faces towards the inventory. Access opening is opposite of facing.
         BlockFacing facing;
         HashSet<LogisticsReservation> reservations;
-        TuningSystem tuningSystem;
+        CoreSystem coreSystem;
 
         /// <summary>
         /// For single-block storage like access ports, this simply returns itself.
@@ -69,10 +69,7 @@ namespace LocustHives.Game.Logistics
         }
 
         // IHiveTunable implementation
-        public IHiveMember GetHiveMemberHandle()
-        {
-            return new GenericBlockEntityLogisticsStorage(Blockentity.Pos, Api);
-        }
+        public IHiveMember HiveMembershipHandle=> new GenericBlockEntityLogisticsStorage(Blockentity.Pos, Api);
 
         public override void Initialize(ICoreAPI api, JsonObject properties)
         {
@@ -81,7 +78,7 @@ namespace LocustHives.Game.Logistics
             var facingCode = properties["facingCode"].AsString();
             facing = BlockFacing.FromCode(Blockentity.Block.Variant[facingCode]);
 
-            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
+            coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
             if (api is ICoreServerAPI sapi)
             {
                 reservations = new HashSet<LogisticsReservation>();
@@ -136,12 +133,7 @@ namespace LocustHives.Game.Logistics
         {
             base.OnBlockRemoved();
 
-            // Detune from hive
-            if (tuningSystem != null)
-            {
-                var handle = GetHiveMemberHandle();
-                tuningSystem.Tune(handle, null);
-            }
+            coreSystem.Zero(HiveMembershipHandle);
 
             CleanupLogistics();
         }

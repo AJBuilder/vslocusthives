@@ -7,31 +7,30 @@ using System.Collections.Generic;
 using System.IO;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace LocustHives.Systems.Logistics
 {
     /// <summary>
-    /// Simple membership handle for block-based logistics storage.
+    /// Simple membership handle for block members.
     /// Identity based on block position.
     /// </summary>
-    public struct GenericBlockEntityLogisticsStorage : IHiveMember, ILogisticsStorage
+    public struct GenericBlockMembership : IHiveMember
     {
         private readonly BlockPos position;
-        private readonly ICoreAPI api;
 
-        public GenericBlockEntityLogisticsStorage(BlockPos position, ICoreAPI api = null)
+        public GenericBlockMembership(BlockPos position)
         {
             this.position = position?.Copy();
-            this.api = api;
         }
 
         // IHiveMember implementation
         public bool IsValid(ICoreAPI api)
         {
-            return GetStorage() != null;
+            return api.World.BlockAccessor.GetBlock(position).Id != 0;
         }
 
-        public static byte[] ToBytes(GenericBlockEntityLogisticsStorage handle)
+        public static byte[] ToBytes(GenericBlockMembership handle)
         {
             using (var ms = new MemoryStream())
             using (var writer = new BinaryWriter(ms))
@@ -46,7 +45,7 @@ namespace LocustHives.Systems.Logistics
             }
         }
 
-        public static GenericBlockEntityLogisticsStorage FromBytes(byte[] data, ICoreAPI api)
+        public static GenericBlockMembership FromBytes(byte[] data, ICoreAPI api)
         {
             using (var ms = new MemoryStream(data))
             using (var reader = new BinaryReader(ms))
@@ -58,55 +57,20 @@ namespace LocustHives.Systems.Logistics
                 var dimension = reader.ReadInt32();
 
                 var pos = new BlockPos(x, y, z, dimension);
-                return new GenericBlockEntityLogisticsStorage(pos, api);
+                return new GenericBlockMembership(pos);
             }
         }
 
-        // ILogisticsStorage implementation - direct, no resolve
-        public IEnumerable<ItemStack> Stacks
-        {
-            get
-            {
-                var behavior = GetStorage();
-                if (behavior == null) yield break;
-
-                foreach (var stack in behavior.Stacks)
-                {
-                    yield return stack;
-                }
-            }
-        }
-
-        public IEnumerable<IStorageAccessMethod> AccessMethods
-        {
-            get
-            {
-                var behavior = GetStorage();
-                if (behavior == null) yield break;
-
-                foreach (var method in behavior.AccessMethods)
-                {
-                    yield return method;
-                }
-            }
-        }
-
-        private ILogisticsStorage GetStorage()
-        {
-            return api.World.BlockAccessor.GetBlockEntity(position)?.GetBehavior<ILogisticsStorage>();
-        }
-
-        // Equality based on position
         public bool Equals(IHiveMember other)
         {
-            return other is GenericBlockEntityLogisticsStorage handle &&
+            return other is GenericBlockMembership handle &&
                    position != null && handle.position != null &&
                    position.Equals(handle.position);
         }
 
         public override bool Equals(object obj)
         {
-            return obj is GenericBlockEntityLogisticsStorage handle && Equals(handle);
+            return obj is GenericBlockMembership handle && Equals(handle);
         }
 
         public override int GetHashCode()

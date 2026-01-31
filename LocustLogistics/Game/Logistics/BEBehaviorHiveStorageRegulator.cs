@@ -21,7 +21,7 @@ namespace LocustHives.Game.Logistics
         ItemStack trackedItem;
         BlockFacing facing;
         LogisticsSystem logisticsSystem;
-        TuningSystem tuningSystem;
+        CoreSystem coreSystem;
         List<LogisticsPromise> promises;
         int clientPromisedAmount;
 
@@ -43,7 +43,7 @@ namespace LocustHives.Game.Logistics
                 if (facing == null) return null;
                 BlockPos targetPos = Pos.AddCopy(facing.Opposite);
                 var be = Api.World.BlockAccessor.GetBlockEntity(targetPos);
-                return be?.GetAs<IHiveTunable>()?.GetHiveMemberHandle() as ILogisticsStorage;
+                return be?.GetAs<IHiveTunable>()?.HiveMembershipHandle as ILogisticsStorage;
             }
         }
 
@@ -57,7 +57,7 @@ namespace LocustHives.Game.Logistics
 
             if (trackedItem != null && !trackedItem.ResolveBlockOrItem(Api.World)) trackedItem = null;
 
-            tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
+            coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
             if (api is ICoreServerAPI serverAPI)
             {
                 promises = new List<LogisticsPromise>();
@@ -97,9 +97,9 @@ namespace LocustHives.Game.Logistics
             {
                 var stack = trackedItem.CloneWithSize(need);
 
-                if (storage is IHiveMember member && tuningSystem.GetMembershipOf(member, out var hiveId))
+                if (storage is IHiveMember member && coreSystem.GetHiveOf(member, out var hive))
                 {
-                    var promise = logisticsSystem.GetNetworkFor(hiveId)?.Request(stack, AttachedStorage);
+                    var promise = logisticsSystem.GetNetworkFor(hive.Id)?.Request(stack, AttachedStorage);
                     if (promise != null)
                     {
                         promise.CompletedEvent += (state) =>

@@ -4,6 +4,29 @@ using ProtoBuf;
 namespace LocustHives.Game.Core
 {
 
+
+    [ProtoContract]
+    public sealed class CoreSaveData
+    {
+        [ProtoMember(1)]
+        public uint nextHiveId;
+
+        [ProtoMember(2)]
+        public Dictionary<uint, HiveSaveData> hives = new();
+
+    }
+
+    [ProtoContract]
+    public sealed class HiveSaveData
+    {
+        
+        [ProtoMember(1)]
+        public string name;
+
+        [ProtoMember(2)]
+        public HiveMemberSaveData[] members;
+    }
+
     [ProtoContract]
     public sealed class HiveMemberSaveData
     {
@@ -15,26 +38,4 @@ namespace LocustHives.Game.Core
         public byte[] data;
 
     }
-
-
-    [ProtoContract]
-    public sealed class CoreSaveData
-    {
-        [ProtoMember(1)]
-        public Dictionary<int, HiveSaveData> hives;
-
-        [ProtoMember(2)]
-        public int nextHiveId;
-    }
-
-    [ProtoContract]
-    public sealed class HiveSaveData
-    {
-        [ProtoMember(1)]
-        public string name;
-
-        [ProtoMember(2)]
-        public HiveMemberSaveData[] members;
-    }
-    
 }

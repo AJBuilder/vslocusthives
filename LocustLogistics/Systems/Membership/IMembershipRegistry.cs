@@ -6,7 +6,7 @@ namespace LocustHives.Systems.Membership
     public interface IMembershipRegistry<T>
     {
 
-        public bool GetMembershipOf(T member, out int membership);
+        public bool GetHiveOf(T member, out int membership);
         public IReadOnlySet<T> GetMembersOf(int membership);
 
         /// <summary>

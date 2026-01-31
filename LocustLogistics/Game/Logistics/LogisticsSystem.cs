@@ -20,15 +20,15 @@ namespace LocustHives.Game.Logistics
 {
     /// <summary>
     /// This mod system manages logistics networks per hive.
-    /// Queries TuningSystem for membership instead of maintaining parallel registries.
+    /// Queries coreSystem for membership instead of maintaining parallel registries.
     /// </summary>
     public class LogisticsSystem : ModSystem
     {
         ICoreServerAPI sapi;
-        TuningSystem tuningSystem;
-        Dictionary<int, HiveLogisticsNetwork> networks;
+        CoreSystem coreSystem;
+        Dictionary<uint, HiveLogisticsNetwork> networks;
 
-        public ILogisticsNetwork GetNetworkFor(int hiveId) => networks.GetValueOrDefault(hiveId, null);
+        public ILogisticsNetwork GetNetworkFor(uint hiveId) => networks.GetValueOrDefault(hiveId, null);
 
         public override void Start(ICoreAPI api)
         {
@@ -41,10 +41,10 @@ namespace LocustHives.Game.Logistics
             api.RegisterBlockClass("BlockHiveStorageRegulator", typeof(BlockHiveStorageRegulator));
             api.RegisterBlockEntityClass("HiveLattice", typeof(BEHiveLattice));
             
-            this.tuningSystem = api.ModLoader.GetModSystem<TuningSystem>();
-            tuningSystem.RegisterMembershipType("locusthives:storage", GenericBlockEntityLogisticsStorage.ToBytes, (bytes) => GenericBlockEntityLogisticsStorage.FromBytes(bytes, api));
-            tuningSystem.RegisterMembershipType("locusthives:lattice", LatticeStorageGroup.ToBytes, (bytes) => LatticeStorageGroup.FromBytes(bytes, api));
-            tuningSystem.RegisterMembershipType("locusthives:worker", GenericBlockEntityLogisticsStorage.ToBytes, (bytes) => GenericBlockEntityLogisticsStorage.FromBytes(bytes, api));
+            this.coreSystem = api.ModLoader.GetModSystem<CoreSystem>();
+            coreSystem.RegisterMembershipType("locusthives:storage", GenericBlockEntityLogisticsStorage.ToBytes, (bytes) => GenericBlockEntityLogisticsStorage.FromBytes(bytes, api));
+            coreSystem.RegisterMembershipType("locusthives:lattice", LatticeStorageGroup.ToBytes, (bytes) => LatticeStorageGroup.FromBytes(bytes, api));
+            coreSystem.RegisterMembershipType("locusthives:worker", GenericBlockEntityLogisticsStorage.ToBytes, (bytes) => GenericBlockEntityLogisticsStorage.FromBytes(bytes, api));
 
         }
 
@@ -55,7 +55,7 @@ namespace LocustHives.Game.Logistics
 
             AiTaskRegistry.Register<AiTaskLocustLogisticsOperation>("doLogisticsAccessTasks");
 
-            this.networks = new Dictionary<int, HiveLogisticsNetwork>();
+            this.networks = new Dictionary<uint, HiveLogisticsNetwork>();
 
             sapi.Event.RegisterGameTickListener((dt) =>
             {
@@ -72,12 +72,12 @@ namespace LocustHives.Game.Logistics
             }, 3000);
         }
 
-        public void EnsureNetwork(int hiveId)
+        public void EnsureNetwork(uint hiveId)
         {
-            if (!networks.ContainsKey(hiveId))
+            if (!networks.ContainsKey(hiveId) && coreSystem.GetHiveOf(hiveId, out var hive))
             {
-                // Query TuningSystem for members
-                networks[hiveId] = new HiveLogisticsNetwork(sapi, tuningSystem.GetMembersOf(hiveId));
+                // Query coreSystem for members
+                networks[hiveId] = new HiveLogisticsNetwork(sapi, hive.Members);
             }
         }
 

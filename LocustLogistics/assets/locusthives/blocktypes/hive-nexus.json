@@ -1,0 +1,72 @@
+{
+    "code": "hivenexus",
+    "behaviors": [
+        { "name": "HorizontalOrientable" },
+        {
+            "name": "Multiblock",
+            "properties": {
+                "sizex": 1,
+                "sizey": 2,
+                "sizez": 1,
+                "cposition": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                }
+            }
+        }
+    ],
+    "entityBehaviors": [ { "name": "HiveNexus" } ],
+	"variantgroups": [
+		{ "code": "side", "loadFromProperties": "abstract/horizontalorientation" }
+	],
+    "attributes": {
+        "canBeTuned": false
+    },
+    "creativeinventory": {
+        "general": [
+            "*-north"
+        ]
+    },
+    "blockmaterial": "Wood",
+    "drawtype": "json",
+    "shapeByType": {
+        "*-north": {
+            "base": "block/hive-nexus"
+        },
+        "*-east": {
+            "base": "block/hive-nexus",
+            "rotateY": -90
+        },
+        "*-south": {
+            "base": "block/hive-nexus",
+            "rotateY": 180
+        },
+        "*-west": {
+            "base": "block/hive-nexus",
+            "rotateY": 90
+        }
+    },
+    "textures": {
+		"machine1": { "base": "game:block/machine/machine1" },
+		"rustyglow": { "base": "game:block/machine/statictranslocator/rustyglow" },
+		"tinbronze3": { "base": "game:block/metal/riveted/tinbronze3" },
+		"oak": { "base": "game:block/wood/oak" },
+		"oak1": { "base": "game:block/wood/planks/oak1" },
+		"oak2": { "base": "game:block/wood/planks/oak2" },
+		"oak3": { "base": "game:block/wood/planks/oak3" },
+		"oak4": { "base": "game:block/wood/planks/oak4" }
+    },
+    "resistance": 20,
+    "materialDensity": 300,
+    "drops": [
+        {
+            "type": "block",
+            "code": "hivenexus-north",
+            "quantity": {
+                "avg": 1,
+                "var": 0
+            }
+        }
+    ]
+}

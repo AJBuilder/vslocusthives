@@ -22,10 +22,8 @@ namespace LocustHives.Game.Core
         bool IsValid(ICoreAPI api);
         
         /// <summary>
-        /// Will be invoked when this member is tuned.
-        ///
-        /// First argument is the previous hive id, second is the new hive id.
+        /// Will be invoked when this member is tuned to a hive.
         /// </summary>
-        void OnTuned(int? prevHiveId, int? hiveId){}
+        void OnTuned(HiveHandle? prevHive, HiveHandle? hive){}
     }
 }

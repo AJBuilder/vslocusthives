@@ -11,7 +11,7 @@ namespace LocustHives.Game.Locust
         bool pathfindingActive;
 
         ILocustNest targetNest;
-        TuningSystem tuningSystem;
+        CoreSystem coreSystem;
 
         IHiveMember member;
 
@@ -25,7 +25,7 @@ namespace LocustHives.Game.Locust
 
             moveSpeed = taskConfig["movespeed"].AsFloat(0.02f);
 
-            tuningSystem = entity.Api.ModLoader.GetModSystem<TuningSystem>();
+            coreSystem = entity.Api.ModLoader.GetModSystem<CoreSystem>();
         }
 
         public override void AfterInitialize()
@@ -49,13 +49,13 @@ namespace LocustHives.Game.Locust
                 entity.WatchedAttributes.HasAttribute("guardedEntityId") ||
                 entity.Attributes.GetLong("unstoredMs") + 10000 > entity.Api.World.ElapsedMilliseconds ||
                 cooldownUntilMs > entity.World.ElapsedMilliseconds ||
-                !tuningSystem.GetMembershipOf(member, out var hive)) return false;
+                !coreSystem.GetHiveOf(member, out var hive)) return false;
 
             // Find nearest nest with room
             ILocustNest nearest = null;
             double minDistSq = double.MaxValue;
 
-            foreach (var nest in tuningSystem.GetMembersOf(hive).OfType<ILocustNest>())
+            foreach (var nest in hive.Members.OfType<ILocustNest>())
             {
                 //if (!nest.HasRoom) continue;
 
@@ -95,7 +95,7 @@ namespace LocustHives.Game.Locust
             // Note: targetNest itself is an ILocustNest, not an IHiveMember handle, so we need to get the handle
             // This is a problem - we can't get the handle from just the ILocustNest interface
             // For now, just check if the member is still in a hive
-            var thisIsTuned = tuningSystem.GetMembershipOf(member, out var memberHive);
+            var thisIsTuned = coreSystem.GetHiveOf(member, out var memberHive);
             if (!thisIsTuned) return false;
 
             // Finish if no longer pathfinding.
