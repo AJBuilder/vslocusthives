@@ -25,6 +25,8 @@ namespace LocustHives.Game.Logistics
         List<LogisticsPromise> promises;
         int clientPromisedAmount;
 
+        long? queuedInventoryCheck;
+
         public ItemStack TrackedItem
         {
             get => trackedItem;
@@ -32,7 +34,16 @@ namespace LocustHives.Game.Logistics
             {
                 trackedItem = value;
                 Blockentity.MarkDirty();
-                CheckInventoryLevel();
+
+                // Any modification to the tracked item will have a buffer.
+                // This allows small incremental changes.
+                // Not sure I like this logic here as it's for human buffering? It should be in the BlockBheavior
+                // but implementing that is more effort so eh for now.
+                if (queuedInventoryCheck.HasValue) Api.Event.UnregisterCallback(queuedInventoryCheck.Value);
+                queuedInventoryCheck = Api.Event.RegisterCallback((dt) => {
+                    queuedInventoryCheck = null;
+                    CheckInventoryLevel();
+                }, 3000);
             }
         }
 
@@ -91,23 +102,24 @@ namespace LocustHives.Game.Logistics
             var targetCount = (uint)Math.Max(0, trackedItem.StackSize);
 
             var need = (int)targetCount - (int)currentLevel;
-            if(need != 0)
+
+            var promised = promises
+                    .Where(p => p.State == LogisticsPromiseState.Unfulfilled)
+                    .Sum(p => p.Stack.StackSize);
+
+            // If sign of the need changed (i.e. promised and need have different signs)
+            // Cancel all promises. This assumes that all promises are of the same sign, which this
+            // logic should guarantee?
+            // If the need is zero, this also cancels promises
+            if((need == 0) || (need > 0 != promised > 0)) {
+                while(promises.Count > 0) promises.First().Cancel();
+                promised = 0;
+            }
+
+            var adjusted = need - promised;
+            if(adjusted != 0)
             {
 
-                var promised = promises
-                        .Where(p => p.State == LogisticsPromiseState.Unfulfilled)
-                        .Sum(p => p.Stack.StackSize);
-
-                // If sign of the need changed (i.e. promised and need have different signs)
-                // Cancel all promises. This assumes that all promises are of the same sign, which this
-                // logic should guarantee?
-                // If the need is zero, this also cancels promises
-                if((need == 0) || (need > 0 != promised > 0)) {
-                    while(promises.Count > 0) promises.First().Cancel();
-                    promised = 0;
-                }
-
-                var adjusted = need - promised;
 
                 if(adjusted != 0)
                 {

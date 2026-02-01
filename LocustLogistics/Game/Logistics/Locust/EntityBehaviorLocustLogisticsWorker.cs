@@ -79,9 +79,7 @@ namespace LocustHives.Game.Logistics.Locust
 
     public class EntityBehaviorLocustLogisticsWorker : EntityBehavior, ILogisticsWorker, IHiveTunable
     {
-        public event Action TasksCancelled;
 
-        LogisticsSystem logisticsSystem;
         PathfindSystem pathfindSystem;
         CoreSystem coreSystem;
 
@@ -150,7 +148,6 @@ namespace LocustHives.Game.Logistics.Locust
             {
                 queuedStorageAccess = new Queue<AccessTask>();
 
-                logisticsSystem = sapi.ModLoader.GetModSystem<LogisticsSystem>();
                 pathfindSystem = sapi.ModLoader.GetModSystem<PathfindSystem>();
 
                 putAwayListenerId = sapi.Event.RegisterGameTickListener(TryToPutAwaySomeInventory, 3000);
@@ -339,7 +336,6 @@ namespace LocustHives.Game.Logistics.Locust
                 {
                     if(state == LogisticsPromiseState.Cancelled){
                         queuedStorageAccess.Clear();
-                        TasksCancelled?.Invoke();
                     }
                     
                     // Release all the reservations

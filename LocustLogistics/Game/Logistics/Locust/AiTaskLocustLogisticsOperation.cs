@@ -28,11 +28,6 @@ namespace LocustHives.Game.Locust
         {
             base.AfterInitialize();
             worker = entity.GetAs<EntityBehaviorLocustLogisticsWorker>();
-            worker.TasksCancelled += () =>
-            {
-                seekingAccess = false;
-                pathTraverser.Stop();
-            };
         }
 
         public override bool ShouldExecute()
